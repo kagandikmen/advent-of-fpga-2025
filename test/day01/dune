@@ -1,0 +1,12 @@
+(library
+ (name test_uart_sum)
+ (inline_tests (deps input.txt))
+ (modules test_uart_sum)
+ (libraries
+   core
+   hardcaml
+   hardcaml_waveterm
+   stdio
+   uart_sum)
+ (preprocess (pps ppx_inline_test ppx_jane)))
+
