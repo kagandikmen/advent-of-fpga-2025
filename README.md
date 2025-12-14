@@ -28,12 +28,12 @@ The challenge of day 1 consists of two steps. For a given turning sequence, it n
 
 ##### Solution
 
-My solution takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially. After each integer arrives, the FPGA computes:
+My solution takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially over UART. After each integer arrives, the FPGA computes:
 
 - whether the lock stops at zero (for step 1)
 - whether the lock hits zero (for step 2)
 
-These computations are performed while the next integer is still being transmitted. This allows for an efficient "pipelined" execution.
+These computations are performed while the next integer is still being transmitted over UART. This allows for an efficient "pipelined" execution that overlaps communication and computation.
 
 For each rotation, the logic computes the quotient and remainder of a division by 100 using iterative subtraction, taking advantage of the rotation values never exceeding 1000 in this case. The iteration count (defaulted to nine) can easily be increased or decreased for different rotation sequences. How the performance vs. area tradeoff would be affected by the usage of division operation may be inquired in the future.
 
