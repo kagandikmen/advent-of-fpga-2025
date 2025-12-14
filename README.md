@@ -1,88 +1,55 @@
-# Hardcaml Arty
+# Advent of FPGA 2025 in Hardcaml
 
-A library to use [Digilent Arty A7 Boards](https://reference.digilentinc.com/reference/programmable-logic/arty-a7/start) with [Hardcaml](https://github.com/janestreet/hardcaml).
+This repository contains my solutions to the [Advent of FPGA 2025](https://blog.janestreet.com/advent-of-fpga-challenge-2025/) challenge from Jane Street. It implements the solutions in Hardcaml, which is an "embedded hardware design domain specific language (DSL) implemented in OCaml" [[1]](https://arxiv.org/abs/2312.15035).
 
-This library has been tested with Arty A7 35 and Arty A7 100.
+This repository is a fork of [hardcaml_arty](https://github.com/fyquah/hardcaml_arty) project, which is a Hardcaml library to interface with Arty A7 boards.
 
-## Features
+## Progress
 
-This library provides a wrapper for the following features in Arty A7 boards:
+|Day   |Status      |
+|:-:   |:-:         |
+|Day 1 |Completed   |
+|Day 2 |Not started |
+|Day 3 |Not started |
+|Day 4 |Not started |
+|Day 5 |Not started |
+|Day 6 |Not started |
+|Day 7 |Not started |
+|Day 8 |Not started |
+|Day 9 |Not started |
+|Day 10|Not started |
+|Day 11|Not started |
+|Day 12|Not started |
 
-- A 166.66667MHz clock and its corresponding synchronous active low clear.
-- A 200MHz clock and its corresponding synchronous active low clear.
-- Control bits (on/off) for the board's LEDs.
-- Control bits (on/off for r, g, and b) for the board's RGB LEDs.
-- UART receive and transmit data streams.
-- Ethernet receive and transmit data streams.
+## Solution Details
 
-## Setup
+<details>
+<summary><b>Day 1:</b> Door Password</summary><br>
 
-This section describes what you'll need to add to an existing Hardcaml design in order to turn it into a bitstream that can run on an Arty A7 board.
+[Solution](src/day01/) [Testbench](test/day01/)
 
-See [examples/blinker](examples/blinker) for an example, reference files to copy into your own project, and instructions on how to:
+##### Challenge Summary
 
-- Install some necessary programs/utilities.
-- Generate the bitstream.
-- Load it onto your board.
+The challenge of day 1 consists of two steps. For a given turning sequence, it needs to be computed:
 
-### Board Metadata
+- how many times the lock mechanism of a door stops at zero (Step 1)
+- how many times the lock mechanism of a door hits zero (Step 2)
 
-Copy the `boards` folder from [examples/blinker](examples/blinker) into the top-level directory of your project.
+##### Solution
 
-This tells Vivado which board to use when compiling your design, provides some configuration for said board, and sets human-readable names for the board's pins that will be used later on in the constraint files.
+My solution takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially. After each integer arrives, the FPGA computes:
 
-### IPs
+- whether the lock stops at zero (for step 1)
+- whether the lock hits zero (for step 2)
 
-Copy the `ips` folder from [examples/blinker](examples/blinker) into the top-level directory of your project.
+These computations are performed while the next integer is still being transmitted. This allows for an efficient "pipelined" execution.
 
-This library makes use of several Xilinx IPs:
+For each rotation, the logic computes the quotient and remainder of a division by 100 using iterative subtraction, taking advantage of the rotation values never exceeding 1000 in this case. The iteration count (defaulted to nine) can easily be increased or decreased for different rotation sequences. How the performance vs. area tradeoff would be affected by the usage of division operation may be inquired in the future.
 
-- The clocking wizard, used for generating aforementioned clock/clear signals from the board's system clock ([Manual](https://www.xilinx.com/support/documentation/ip_documentation/clk_wiz/v6_0/pg065-clk-wiz.pdf)).
-- The Tri-Mode Ethernet MAC, used for supporting Ethernet communication ([Manual](https://www.xilinx.com/support/documentation/ip_documentation/tri_mode_ethernet_mac/v9_0/pg051-tri-mode-eth-mac.pdf)).
+</details>
 
-Please note that while the clocking wizard is provided alongside Vivado software installation, the ethernet MAC requires a special license. See the [examples/blinker README](examples/blinker) for more information.
+## License
 
-### RTL Generation Executable
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
-Essentially, this library works by taking a Hardcaml subcircuit that contains your design, and wrapping to abstract away some messy infrastructure / IP interaction so you can work with a clean, simple API.
-This means you will need to give it a subcircuit that implements the [`User_application.I` and `User_application.O`](https://github.com/fyquah/hardcaml_arty/blob/master/src/infrastructure/user_application.mli) [Hardcaml interfaces](https://github.com/janestreet/hardcaml/blob/master/docs/module_hierarchy.mdx#a-design-pattern-for-circuits). Once you have that, you can use this library's `Rtl_generator.generate` function to generate Arty A7-compatible Verilog output.
-
-We recommmend creating an `arty.ml` file (with the corresponding `dune` config to make it an executable) in the top-level directory of your project that defines a `create` function which wraps your design to input/output the aforementioned `User_application` interfaces, then define a main function:
-
-```
-let () =
-  Hardcaml_arty.Rtl_generator.generate create (To_channel Stdio.stdout)
-;;
-```
-
-### Constraint Files
-
-Copy the `place.tcl`, `route.tcl`, `synth.tcl`, and `Makefile` files from [examples/blinker) into the top-level directory of your project.
-
-These files instruct Vivado to generate the bitstream for your design:
-
-- `synth.tcl` synthesizes your design into a netlist, including the aforementioned IPs.
-- `place.tcl` binds the input and output ports used by this library's wrapper module to pins on the board, and runs implementation.
-- `route.tcl` generates the bitstream.
-
-The `Makefile` links these build steps together. You'll need to adjust it slightly for the RTL generation executable you made in the previous step (e.g. replacing "blinker" with "arty").
-The `Makefile` requires a `BOARD` env variable parameter which can be either `arty-a7-35` or `arty-a7-100`.
-
-### How to Run
-
-Now, all that's left is to actually generate a bitstream and load it onto your board! Follow the instructions at [examples/blinker](examples/blinker), adapting to your project's directory structure.
-
-## Board Tools Reference
-
-This section is a summary of the tools offered by this library to interact with some of the less trivial Arty A7 components, notably UART and Ethernet.
-
-### UART
-
-UART input/output data streams are encoded as a [Hardcaml With_valid](https://ocaml.janestreet.com/ocaml-core/v0.13/doc/hardcaml/Hardcaml/With_valid/index.html) record, which has `value` and `valid` fields.
-`value` is an 8-bit wire that represents the last 8 received UART data bits, with the MSB corresponding to the most recently received bit.
-`valid` becomes `1` when every 8th UART bit is received; that is, when every byte has been completely received.
-
-The UART uses the 166.66667MHz clock signal and corresponding clear, and processes one bit every `166_667_000 / 115_200 = 1446` cycles.
-
-### Ethernet
-
+---
