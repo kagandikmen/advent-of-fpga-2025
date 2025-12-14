@@ -4,22 +4,13 @@ This repository contains my solutions to the [Advent of FPGA 2025](https://blog.
 
 This repository is a fork of [hardcaml_arty](https://github.com/fyquah/hardcaml_arty) project, which is a Hardcaml library to interface with Arty A7 boards.
 
-## Progress
+## Advent Calendar (aka Project Progress)
 
-|Day   |Status      |
-|:-:   |:-:         |
-|Day 1 |Completed   |
-|Day 2 |Not started |
-|Day 3 |Not started |
-|Day 4 |Not started |
-|Day 5 |Not started |
-|Day 6 |Not started |
-|Day 7 |Not started |
-|Day 8 |Not started |
-|Day 9 |Not started |
-|Day 10|Not started |
-|Day 11|Not started |
-|Day 12|Not started |
+███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;8.3%
+
+0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ⬜  
+0️⃣5️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
+0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Solution Details
 
