@@ -1,4 +1,4 @@
 (library
- (name uart_sum)
+ (name day01)
  (libraries core hardcaml hardcaml_arty)
  (preprocess (pps ppx_deriving_hardcaml ppx_jane)))

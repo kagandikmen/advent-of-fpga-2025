@@ -1,12 +1,12 @@
 (library
- (name test_uart_sum)
+ (name test_day01)
  (inline_tests (deps input.txt))
- (modules test_uart_sum)
+ (modules test_day01)
  (libraries
    core
+   day01
    hardcaml
    hardcaml_waveterm
-   stdio
-   uart_sum)
+   stdio)
  (preprocess (pps ppx_inline_test ppx_jane)))
 

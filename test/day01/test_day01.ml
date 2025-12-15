@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 1
  * Created:     2025-12-12
- * Modified:    2025-12-14
+ * Modified:    2025-12-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -39,7 +39,7 @@ let%expect_test "day01_test" =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let stopped_at_zero_ctr, hit_zero_ctr = Uart_sum.create_counting_logic
+  let stopped_at_zero_ctr, hit_zero_ctr = Day01.create_counting_logic
     ~clock
     ~clear
     ~cycles_per_bit
