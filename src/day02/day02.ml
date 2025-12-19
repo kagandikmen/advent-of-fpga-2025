@@ -1,8 +1,8 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 1 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 2 (Step 1 & Step 2)
  * Created:     2025-12-15
- * Modified:    2025-12-15
+ * Modified:    2025-12-19
  * Author:      Kagan Dikmen
  *
  *)
