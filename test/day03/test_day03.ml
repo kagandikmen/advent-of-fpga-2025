@@ -22,9 +22,8 @@ let parse_line =
     else Some s
 ;;
 
-let%expect_test "day03_test" =
+let day03_test ~k =
   let cycles_per_bit = 4 in
-  let k = 2 in
 
   let banks = In_channel.read_lines "input.txt"
     |> List.filter_map ~f:parse_line
@@ -94,13 +93,24 @@ let%expect_test "day03_test" =
 
   let final_toj = Bits.to_int !toj in
 
-  printf "%d" final_toj;
-
   Out_channel.flush vcd_oc;
   Out_channel.close vcd_oc;
+
+  final_toj
+;;
+
+let%expect_test "day03_test_k2" =
+  let result = day03_test ~k:2 in
+  printf "%d\n" result;
 
   [%expect {|
     17324
   |}]
 
-;;
+let%expect_test "day03_test_k12" =
+  let result = day03_test ~k:12 in
+  printf "%d\n" result;
+
+  [%expect {|
+    171846613143331
+  |}]

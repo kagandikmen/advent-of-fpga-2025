@@ -6,9 +6,9 @@ This repository is a fork of [hardcaml_arty](https://github.com/fyquah/hardcaml_
 
 ## Advent Calendar (aka Project Progress)
 
-██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;16.7%
+█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;25.0%
 
-0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ⬜  
+0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ⬜  
 0️⃣5️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
@@ -65,6 +65,30 @@ Instead of sending all values in the range one after another, an implementation 
 - logic to increment BCD
 
 need to be added to the implementation.
+
+</details>
+
+<details>
+<summary><b>Day 3:</b> Lobby</summary><br>
+
+[Solution](src/day03/) [Testbench](test/day03/)
+
+##### Challenge Summary
+
+The challenge of day 3 also consists of two steps. For any given digit sequence, the challenge requires us to compute what is the highest achievable value after deleting a given number of digits. In the first step, 2 digits are left; in the second step, 12 are left.
+
+##### My Solution
+
+In my solution, the sequence for each bank is transmitted to the FPGA digit by digit via UART, starting from the most significant digit. The digits are not converted to integers this time, they are sent as 8-bit ASCII characters. In this challenge, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first step. 88 of them for the second step, likewise. For any given number of digits to pick, k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are converted to decimal and added to a running total.
+
+##### Suggestions
+
+My implementation hardcodes the bank width 100 to the logic. Although this is easily changeable in the source code, one may want a design capable to adjust itself for different sequence widths. I can think of two ways:
+
+- **Accepting the whole sequence, and then starting the computation:** In such an implementation all digits of the sequence would first be transmitted and saved by the FPGA. Once the FPGA is "notified" that the transmission is completed, it would start to iterate over the digits from the most significant to the least significant.
+- **Sending the sequence width beforehand:** In such an implementation the host would first send the width of the sequence and then start sending the digits one by one. The digits would still all be processed immediately on arrival.
+
+I personally like the second much more. The first one asks for a lot more memory, and requires back-and-forth communication between the host and the FPGA. Not to mention one will have to set a maximum sequence width anyways, as the number of registers is fixed at design time. The second one handles the problem with much less memory overhead, and it does not require the host to wait for a done signal from the FPGA either.
 
 </details>
 
