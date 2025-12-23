@@ -15,7 +15,17 @@ jobs:
       - name: Install opam
         run: |
           sudo apt update && sudo apt-get update
-          sudo bash .github/install_opam.sh
+          sudo apt-get install -y opam
+
+      - name: Setup switch and dependencies
+        run: |
+          opam init -y
+          opam switch create hardcaml 4.13.1
+          eval $(opam env --switch=hardcaml)
+          opam repo add janestreet-bleeding https://ocaml.janestreet.com/opam-repository -y
+          opam repo add janestreet-bleeding-external https://github.com/janestreet/opam-repository.git#external-packages -y
+          opam install -y ocaml-lsp-server odoc ocamlformat utop
+          opam install -y hardcaml hardcaml_waveterm ppx_jane ppx_expect ppx_deriving_hardcaml
       
       - name: Run tests
         run: |
