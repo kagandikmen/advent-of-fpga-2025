@@ -1,0 +1,22 @@
+name: Run Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install opam
+        uses: |
+          sudo apt update && sudo apt-get update
+          sudo bash .github/install_opam.sh
+      
+      - name: Run tests
+        uses: dune runtest
+        
