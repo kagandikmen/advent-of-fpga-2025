@@ -1,7 +1,7 @@
 #!/bin/bash
 
 apt-get install opam
-opem init -y
+opam init -y
 eval $(opam env)
 opam install ocaml-lsp-server odoc ocamlformat utop
 opam switch create hardcaml 4.13.1
