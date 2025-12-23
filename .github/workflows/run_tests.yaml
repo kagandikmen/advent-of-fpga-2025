@@ -1,4 +1,4 @@
-name: Run Tests
+name: AoF 2025 - Puzzle Tests
 
 on:
   push:
