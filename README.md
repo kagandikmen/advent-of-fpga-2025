@@ -6,9 +6,9 @@ This repository is a fork of the [hardcaml_arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-█████████░░░░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;25.0%
+████████████░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;33.3%
 
-0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ⬜  
+0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
 0️⃣5️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
@@ -89,6 +89,49 @@ My implementation hardcodes the bank width 100 to the logic. Although this is ea
 - **Sending the sequence width beforehand:** In such an implementation the host would first send the width of the sequence and then start sending the digits one by one. The digits would still all be processed immediately on arrival.
 
 I personally like the second much more. The first one asks for a lot more memory, and requires back-and-forth communication between the host and the FPGA. Not to mention one will have to set a maximum sequence width anyways, as the number of registers is fixed at design time. The second one handles the problem with much less memory overhead, and it does not require the host to wait for a done signal from the FPGA either.
+
+</details>
+
+<details>
+<summary><b>Day 4:</b> Printing Department</summary><br>
+
+<h2>Day 4: Printing Department</h2>
+
+### Summary
+
+The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in this case. The first step asks for how many vertices are removed in the first iteration, whereas the second step asks for how many are removed for an iteration count approaching infinity.
+
+### My Solution
+
+[My solution](src/day04/) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
+
+- **LOAD**: In this state, all field info is transmitted to the FPGA via UART. The dots and ats are transmitted in ASCII format without any host processing. The FPGA receives and stores them one by one into a 140x140 grid. Each cell of the grid has the following contents:
+
+```ocaml
+module Cell = struct
+  type 'a t =
+  {
+    is_roll: 'a;
+    is_accessible: 'a;
+  }
+
+  ...
+end
+```
+
+Both `is_roll` and `is_accessible` are 1-bit wide. The state LOAD only writes `is_roll` though, `is_accessible` is computed in the state MARK. After the loading of all fields is complete, the FSM continues with the state MARK.
+
+- **MARK**: This state iterates over all cells, computes their accessibility, and sets their `is_accessible` field accordingly. An accessible cell is a cell that has less than 4 neighbors occupied by paper rolls. Once all cells are iterated, the FSM continues onto the state REMOVE.
+- **REMOVE**: This state iterates over all cells once again, and sets their `is_roll` field zero if they are both occupied by a roll and set accessible by the MARK state. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of MARK-REMOVE iterations is achieved. If yes, then the FSM moves onto DONE. If not, then it returns back to MARK for another iteration. For the case where `max_passes` is set to zero, the MARK-REMOVE loop continues forever until there are no more rolls to remove. The number of removed rolls is accumulated in the register `total_removed`.
+- **DONE**: This is the state the logic arrives at after breaking from the MARK-REMOVE loop. The FPGA signals back to the host that the computation is done, so the host knows that `total_removed` is stabilized.
+
+`max_passes` is not a compile-time constant. It is implemented as an input signal to the FPGA. I presume it would be fairly easy to make it a compile-time constant, though.
+
+The grid dimensions are a compile-time constant. That each cell is implemented as a 2-bit field helps minimize the memory footprint.
+
+### Suggestions
+
+The algorithm in itself is unfortunately not very hardware-friendly. The 140x140 grid is therefore a necessity rather than a design choice. To improve performance, another algorithm could be implemented to keep track of the roll removals of the previous row. This would enable the two states MARK and REMOVE to be merged together, resulting in sizeable performance boost.
 
 </details>
 
