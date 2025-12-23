@@ -10,13 +10,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        run: actions/checkout@v4
 
       - name: Install opam
-        uses: |
+        run: |
           sudo apt update && sudo apt-get update
           sudo bash .github/install_opam.sh
       
       - name: Run tests
-        uses: dune runtest
+        run: dune runtest
         
