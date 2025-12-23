@@ -18,5 +18,7 @@ jobs:
           sudo bash .github/install_opam.sh
       
       - name: Run tests
-        run: dune runtest
+        run: |
+          eval $(opam env --switch=hardcaml)
+          dune runtest
         
