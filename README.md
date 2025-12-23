@@ -56,7 +56,7 @@ The puzzle of day 1 consists of two steps. For a given turning sequence, it need
 
 ### My Solution
 
-[My solution](src/day01/) takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially over UART. After each integer arrives, the FPGA computes:
+[My solution](src/day01/day01.ml) takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially over UART. After each integer arrives, the FPGA computes:
 
 - whether the lock stops at zero (for step 1)
 - whether the lock hits zero (for step 2)
@@ -83,7 +83,7 @@ For further reference, I called the integers that fulfill these criteria "silly 
 
 ### My Solution
 
-In [my solution](src/day02/), the range bounds are first converted into 40-bit integers. The host (testbench) then sends all values in the range sequentially through UART. After arriving at the FPGA, the values are then converted into binary-coded decimal (BCD) format to enable digit processing. The function that does the conversion takes advantage of the fact that the biggest range value has 10 digits, but this is easily configurable in the source code. The logic then computes how many leading zeros the number has. After that, it is computed whether the number is silly and/or goofy. Finally, the number is added to a running total or dismissed.
+In [my solution](src/day02/day02.ml), the range bounds are first converted into 40-bit integers. The host (testbench) then sends all values in the range sequentially through UART. After arriving at the FPGA, the values are then converted into binary-coded decimal (BCD) format to enable digit processing. The function that does the conversion takes advantage of the fact that the biggest range value has 10 digits, but this is easily configurable in the source code. The logic then computes how many leading zeros the number has. After that, it is computed whether the number is silly and/or goofy. Finally, the number is added to a running total or dismissed.
 
 ### Suggestions
 
@@ -107,7 +107,7 @@ The puzzle of day 3 also consists of two steps. For any given digit sequence, th
 
 ### My Solution
 
-In [my solution](src/day03/), the sequence for each bank is transmitted to the FPGA digit by digit via UART, starting from the most significant digit. The digits are not converted to integers this time, they are sent as 8-bit ASCII characters. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first step. 88 of them for the second step, likewise. For any given number of digits to pick, k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are converted to decimal and added to a running total.
+In [my solution](src/day03/day03.ml), the sequence for each bank is transmitted to the FPGA digit by digit via UART, starting from the most significant digit. The digits are not converted to integers this time, they are sent as 8-bit ASCII characters. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first step. 88 of them for the second step, likewise. For any given number of digits to pick, k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are converted to decimal and added to a running total.
 
 ### Suggestions
 
@@ -131,7 +131,7 @@ The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in t
 
 ### My Solution
 
-[My solution](src/day04/) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
+[My solution](src/day04/day04.ml) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
 
 - **LOAD**: In this state, all field info is transmitted to the FPGA via UART. The dots and ats are transmitted in ASCII format without any host processing. The FPGA receives and stores them one by one into a 140x140 grid. Each cell of the grid has the following contents:
 
