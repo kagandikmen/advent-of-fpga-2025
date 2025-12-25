@@ -8,10 +8,10 @@ This repository is a fork of the [hardcaml_arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-████████████░░░░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;33.3%
+███████████████░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;41.7%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
-0️⃣5️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
+0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
@@ -203,6 +203,50 @@ The grid dimensions are a compile-time constant. That each cell is implemented a
 ### Suggestions
 
 The algorithm in itself is unfortunately not very hardware-friendly. The 140x140 grid is therefore a necessity rather than a design choice. To improve performance, another algorithm could be implemented to keep track of the roll removals of the previous row. This would enable the two states MARK and REMOVE to be merged together, resulting in sizeable performance boost.
+
+</details>
+
+<details>
+<summary><b>Day 5:</b> Cafeteria</summary><br>
+
+<h2>Day 5: Cafeteria</h2>
+
+### Summary
+
+Like the others, the puzzle for day 5 consists of two steps. It is based on a text input that consists of lines that are either integers (IDs) or integer ranges. In the first step, it is computed how many of the IDs fall on at least one of the ranges. In the second step, it is computed how many integers in general fall on at least one of the ranges. The main challenge, especially in step two, is that the ranges both overlap and come unsorted.
+
+### My Solution
+
+[My solution](src/day05/day05.ml) implements a data structure called "Package" to standardize sending of ranges, ingredient IDs, and other sorts of control signals. Every package consists of an 8-bit flag and 64-bit payload. The 8-bit flag:
+
+- `0x01` signals that the payload is the lower bound of a new range,
+- `0x02` signals that the payload is the upper bound of the range the lower bound of which was just sent,
+- `0x03` signals "section change," which means that all ranges are done being sent and ingredient IDs will follow,
+- `0x04` signals that the payload is an ingredient ID,
+- `0xFF` signals EOF.
+
+Other 8-bit values are invalid as flags. My solution then implements the following state machine:
+
+```ocaml
+module States = struct
+  type t =
+    | Read_ranges
+    | Read_ids
+    | Merge_scan
+    | Merge_take
+    | Count_ids
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
+
+The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the order they are fed to the UART bus by the host. The moment the host signals a section change, the logic transfers to the state `Read_ids`. When the host is done with sending all IDs, it signals EOF, and the logic starts sorting the ranges. The sorting process (selection sort) starts with the state `Merge_scan`. In this state, the FPGA looks for the range with the lowest lower bound that is not marked as "used" yet. Then it moves onto the state `Merge_take`, which is where we scan through all unused ranges once again for candidates eligible for a range merge. Then, if there are still unused ranges left, the FPGA goes back to the state `Merge_scan`. Once the `Merge_scan - Merge_take` loop is completed, the logic goes into the `Count_ids` state. In this state, we count how many of the IDs fall in any one of the merged ranges. Finally, the FPGA arrives at the state `Done`, where it signals back to the host that the computation is successfully completed.
+
+### Suggestions
+
+I don't know how it could be done, but a better sorting & merging algorithm would be much appreciated. Sorting is not particularly hardware-friendly. Selection sort, the sorting algorithm I implemented, has a time complexity of O(n^2). If there is any possibility to sort the ranges before feeding them into the FPGA, this would prevent a lot of computation & logic complexity from happening in the first place.
+
+Another suggestion could be made about the packaging, in case we are on a quest to save every single cycle possible. The section change and EOF signals do not send any meaningful payload, but the FPGA waits for this payload to be fully sent before going forward with the signaled operation. In current implementation, the host fills the payload field with zeros. This is not even remotely the performance bottleneck of the application, but fixing it would save a couple cycles.
 
 </details>
 
