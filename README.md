@@ -108,7 +108,7 @@ These computations are performed while the next integer is still being transmitt
 
 For each rotation, the logic computes the quotient and remainder of a division by 100 using iterative subtraction, taking advantage of the rotation values never exceeding 1000 in this case. The iteration count (defaulted to nine) can easily be increased or decreased for different rotation sequences. How the performance vs. area tradeoff would be affected by the usage of division operation may be inquired in the future.
 
-</details>
+<br><br><br></details>
 
 <details>
 <summary><b>Day 2:</b> Gift Shop</summary><br>
@@ -137,7 +137,7 @@ Instead of sending all values in the range one after another, an implementation 
 
 need to be added to the implementation.
 
-</details>
+<br><br><br></details>
 
 <details>
 <summary><b>Day 3:</b> Lobby</summary><br>
@@ -161,7 +161,7 @@ My implementation hardcodes the bank width 100 to the logic. Although this is ea
 
 I personally like the second much more. The first one asks for a lot more memory, and requires back-and-forth communication between the host and the FPGA. Not to mention one will have to set a maximum sequence width anyways, as the number of registers is fixed at design time. The second one handles the problem with much less memory overhead, and it does not require the host to wait for a done signal from the FPGA either.
 
-</details>
+<br><br><br></details>
 
 <details>
 <summary><b>Day 4:</b> Printing Department</summary><br>
@@ -204,7 +204,7 @@ The grid dimensions are a compile-time constant. That each cell is implemented a
 
 The algorithm in itself is unfortunately not very hardware-friendly. The 140x140 grid is therefore a necessity rather than a design choice. To improve performance, another algorithm could be implemented to keep track of the roll removals of the previous row. This would enable the two states MARK and REMOVE to be merged together, resulting in sizeable performance boost.
 
-</details>
+<br><br><br></details>
 
 <details>
 <summary><b>Day 5:</b> Cafeteria</summary><br>
@@ -232,15 +232,15 @@ module States = struct
   type t =
     | Read_ranges
     | Read_ids
-    | Merge_scan
-    | Merge_take
-    | Count_ids
+    | Scan
+    | Merge
+    | Count
     | Done
   [@@deriving sexp_of, compare, enumerate]
 end
 ```
 
-The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the order they are fed to the UART bus by the host. The moment the host signals a section change, the logic transfers to the state `Read_ids`. When the host is done with sending all IDs, it signals EOF, and the logic starts sorting the ranges. The sorting process (selection sort) starts with the state `Merge_scan`. In this state, the FPGA looks for the range with the lowest lower bound that is not marked as "used" yet. Then it moves onto the state `Merge_take`, which is where we scan through all unused ranges once again for candidates eligible for a range merge. Then, if there are still unused ranges left, the FPGA goes back to the state `Merge_scan`. Once the `Merge_scan - Merge_take` loop is completed, the logic goes into the `Count_ids` state. In this state, we count how many of the IDs fall in any one of the merged ranges. Finally, the FPGA arrives at the state `Done`, where it signals back to the host that the computation is successfully completed.
+The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the order they are fed to the UART bus by the host. The moment the host signals a section change, the logic transfers to the state `Read_ids`. When the host is done with sending all IDs, it signals EOF, and the logic starts sorting the ranges. The sorting process (selection sort) starts with the state `Scan`. In this state, the FPGA looks for the range with the lowest lower bound that is not marked as "used" yet. Then it moves onto the state `Merge`, which is where we scan through all unused ranges once again for candidates eligible for a range merge. Then, if there are still unused ranges left, the FPGA goes back to the state `Scan`. Once the `Scan`-`Merge` loop is completed, the logic goes into the `Count` state. In this state, we count how many of the IDs fall in any one of the merged ranges. Finally, the FPGA arrives at the state `Done`, where it signals back to the host that the computation is successfully completed.
 
 ### Suggestions
 
@@ -248,7 +248,7 @@ I don't know how it could be done, but a better sorting & merging algorithm woul
 
 Another suggestion could be made about the packaging, in case we are on a quest to save every single cycle possible. The section change and EOF signals do not send any meaningful payload, but the FPGA waits for this payload to be fully sent before going forward with the signaled operation. In current implementation, the host fills the payload field with zeros. This is not even remotely the performance bottleneck of the application, but fixing it would save a couple cycles.
 
-</details>
+<br><br><br></details>
 
 ## License
 

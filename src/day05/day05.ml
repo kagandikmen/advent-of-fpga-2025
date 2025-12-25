@@ -33,9 +33,9 @@ module States = struct
   type t =
     | Read_ranges
     | Read_ids
-    | Merge_scan
-    | Merge_take
-    | Count_ids
+    | Scan
+    | Merge
+    | Count
     | Done
   [@@deriving sexp_of, compare, enumerate]
 end
@@ -266,10 +266,10 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   scan_best_lo <-- ones 64;
                   scan_best_hi <--. 0;
                   scan_best_i <--. 0;
-                  sm.set_next States.Merge_scan;
+                  sm.set_next States.Scan;
                 ];
             ]);
-          (States.Merge_scan,
+          (States.Scan,
             [
               when_ (scan_i.value <>: range_count.value)
                 (
@@ -297,10 +297,10 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
 
               when_ (scan_i.value ==: range_count.value)
                 [
-                  sm.set_next States.Merge_take;
+                  sm.set_next States.Merge;
                 ];
             ]);
-          (States.Merge_take,
+          (States.Merge,
             [
               when_ (scan_found_any.value ==:. 0)
                 (
@@ -308,7 +308,7 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   @ [
                     num_fresh <--. 0;
                     id_i <--. 0;
-                    sm.set_next States.Count_ids
+                    sm.set_next States.Count
                   ]
                 );
               
@@ -351,12 +351,12 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                       scan_best_lo <-- ones 64;
                       scan_best_hi <--. 0;
                       scan_best_i <--. 0;
-                      sm.set_next States.Merge_scan;
+                      sm.set_next States.Scan;
                     ]
                   )
                 );
             ]);
-          (States.Count_ids,
+          (States.Count,
             [
               when_ (id_i.value ==: id_count.value)
                 [
