@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 4
  * Created:     2025-12-22
- * Modified:    2025-12-23
+ * Modified:    2025-12-26
  * Author:      Kagan Dikmen
  *
  *)
@@ -63,12 +63,12 @@ let day04_test ~max_passes =
   let cycle () = Cyclesim.cycle sim in
   let wait c = for _ = 1 to c do cycle () done in
 
-  let rec wait_until_done ~step ~max_cycles =
-    if max_cycles = 0 then failwith "Timeout"
+  let rec wait_until_done ~step ~max_steps =
+    if max_steps = 0 then failwith "Timeout"
     else (
       wait step;
       if Bits.to_bool !is_done then ()
-      else wait_until_done ~step ~max_cycles:(max_cycles-1)
+      else wait_until_done ~step ~max_steps:(max_steps-1)
     )
   in
 
@@ -101,7 +101,7 @@ let day04_test ~max_passes =
     String.iter line ~f:send_ascii_char;
   );
 
-  wait_until_done ~step:1000 ~max_cycles:20_000_000;
+  wait_until_done ~step:1000 ~max_steps:20_000_000;
 
   let final_trc = Bits.to_int !total_rolls_collected in
 
