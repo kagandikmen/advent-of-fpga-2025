@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 5 (Step 1 & Step 2)
  * Created:     2025-12-24
- * Modified:    2025-12-25
+ * Modified:    2025-12-26
  * Author:      Kagan Dikmen
  *
  *)
@@ -221,6 +221,23 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let scan_best_lo = Variable.reg spec ~width:64 in
   let scan_best_hi = Variable.reg spec ~width:64 in
   let scan_found_any = Variable.reg spec ~width:1 in
+
+  let set_scan_up =
+    [
+      scan_i <--. 0;
+      scan_found_any <--. 0;
+      scan_best_lo <-- ones 64;
+      scan_best_hi <--. 0;
+      scan_best_i <--. 0;
+    ]
+  in
+
+  let scan_count_up =
+    [
+      num_fresh <--. 0;
+      id_i <--. 0;
+    ]
+  in
     
   compile
     [
@@ -260,14 +277,12 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                 );
 
               when_ (pkg_valid.value &: flag_eof)
-                [
-                  scan_i <--. 0;
-                  scan_found_any <--. 0;
-                  scan_best_lo <-- ones 64;
-                  scan_best_hi <--. 0;
-                  scan_best_i <--. 0;
-                  sm.set_next States.Scan;
-                ];
+                (
+                  set_scan_up
+                  @ [
+                    sm.set_next States.Scan;
+                  ]
+                );
             ]);
           (States.Scan,
             [
@@ -305,9 +320,8 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
               when_ (scan_found_any.value ==:. 0)
                 (
                   push_current_range
+                  @ scan_count_up
                   @ [
-                    num_fresh <--. 0;
-                    id_i <--. 0;
                     sm.set_next States.Count
                   ]
                 );
@@ -345,12 +359,8 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                           ]
                         )
                     ]
+                    @ set_scan_up
                     @ [
-                      scan_i <--. 0;
-                      scan_found_any <--. 0;
-                      scan_best_lo <-- ones 64;
-                      scan_best_hi <--. 0;
-                      scan_best_i <--. 0;
                       sm.set_next States.Scan;
                     ]
                   )
