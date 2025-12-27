@@ -261,15 +261,17 @@ Like the others, the puzzle for day 6 consists of two parts. It is based on a te
 
 ### My Solution
 
-[My solution](src/day06/day06.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text", the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero preprocessing this time) one by one into the array `grid`. The source code includes some functions to index into this array as if it is a matrix. 
+[My solution](src/day06/day06_new.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text", the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero preprocessing this time) one by one in its RAM.
 
-When the host transfers the ASCII value "end of text", the FPGA moves onto the state `Find_opblk_start`. Then moving further onto the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which column the next opblock starts and ends. (Bear in mind our columns are one character wide.) Once the borders are figured out, the FPGA continues with the state `Compute`, which is where the "secondary state machines" activate simultaneously. These secondary state machines are actually the same state machine instantiated twice; they only differ in the specifics of the computation their states include. The first is for part 1, and the second is for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
+When the host transfers the ASCII value "end of text", the FPGA moves onto the state `Find_opblk_start`. Then moving further onto the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which column the next opblock starts and ends. (Bear in mind our columns are one character wide.) Once the borders are figured out, the FPGA continues with the states `Setup_compute` and `Compute`, the latter of which activates the "secondary state machines." These secondary state machines are actually the same state machine instantiated twice; they work simultaneously; and they only differ in the specifics of the computation one of their states includes. The first state machine is for part 1, and the second is for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
 
-When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the `Find_opblk_start`-`Find_opblk_end`-`Compute` loop. After all opblocks are processed, the running totals are returned to the host.
+When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the loop: `Find_opblk_start`-`Find_opblk_end`-`Setup_compute`-`Compute`. After all opblocks are processed this way, the running totals are returned to the host.
+
+There was an [older solution](src/day06/day06_old.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. As it takes linear time to index, read, or write to arrays, this older implementation was embarrassingly slow. The random access into the "character memory" as offered by the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour.
 
 ### Suggestions
 
-The current implementation is very slow for some reason. I even had to work with a smaller input sequence to be able to finish the puzzle. I will, hopefully, return back to this puzzle to improve performance. I suspect it is due to the fact that the grid is implemented as an array, which comes with a linear time complexity for indexing/reading/writing.
+I feel like the main state machine could be made more compact by removing the state `Setup_compute`. I am planning to revisit this puzzle to see if the compute setup can be moved to the `Find_opblk_end` and/or `Compute` states.
 
 <br><br><br></details>
 
