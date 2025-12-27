@@ -257,7 +257,7 @@ Another suggestion could be made about the packaging, in case we are on a quest 
 
 ### Summary
 
-Like the others, the puzzle for day 6 consists of two parts. It is based on a text input that consists of a matrix of integers, followed by a final row of operation signs. (Either addition or multiplication in this case.) The integers (plus operator) that are found in the same column belong to each other and constitute an operation. (I called this union of integers and operator an "opblock".) In part 1, the integers are to be parsed left to right, whereas in part 2 they are parsed from top to bottom.
+Like the others, the puzzle for day 6 consists of two parts. It is based on a text input that consists of a matrix of integers, followed by a final row of operation signs. (Either addition or multiplication in this case.) The integers (and the operator) that are found in the same column belong to each other and constitute an operation. (I called this union of integers and operator an "opblock".) In part 1, the integers are to be parsed left to right, whereas in part 2 they are parsed from top to bottom.
 
 ### My Solution
 
