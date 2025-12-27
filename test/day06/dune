@@ -1,0 +1,12 @@
+(library
+ (name test_day06)
+ (inline_tests (deps input.txt))
+ (modules test_day06)
+ (libraries
+   core
+   day06
+   hardcaml
+   hardcaml_waveterm
+   stdio)
+ (preprocess (pps ppx_inline_test ppx_jane)))
+
