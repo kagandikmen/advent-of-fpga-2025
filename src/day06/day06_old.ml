@@ -1,11 +1,16 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 6 (Step 1 & Step 2)
+ * AoF - (Old) Hardcaml Solution for Day 6 (Step 1 & Step 2)
  * Created:     2025-12-26
  * Modified:    2025-12-27
  * Author:      Kagan Dikmen
  *
  *)
+
+(*************************** IMPORTANT ****************************)
+(* This is the older unbearably-slow array-based implementation.  *)
+(* For the newer & much-faster RAM-based one, see day06_new.ml    *)
+(******************************************************************)
 
 (* TODO: Add FPGA build and RTL generation logic *)
 
@@ -61,7 +66,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_rows = 8 in
-  let max_cols = 64 in
+  let max_cols = 4096 in
   let grid_size = max_rows * max_cols in
 
   let uart_rx = Uart.Expert.create_rx_state_machine

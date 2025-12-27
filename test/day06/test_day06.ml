@@ -13,6 +13,8 @@ open! Hardcaml_arty
 open! Hardcaml_waveterm
 open! Signal
 
+open Day06
+
 module Waveform = Hardcaml_waveterm.Waveform
 
 let%expect_test "day06_test" =
@@ -28,7 +30,7 @@ let%expect_test "day06_test" =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let total_p1, total_p2, is_done = Day06.create_day06_logic
+  let total_p1, total_p2, is_done = Day06_new.create_day06_logic
     ~clock
     ~clear
     ~cycles_per_bit
@@ -104,7 +106,7 @@ let%expect_test "day06_test" =
   Out_channel.close vcd_oc;
 
   [%expect {|
-    5274710596
-    50201002257
+    5524274308182
+    8843673199391
   |}]
 ;;
