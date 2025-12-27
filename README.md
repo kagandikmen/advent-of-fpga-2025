@@ -8,10 +8,10 @@ This repository is a fork of the [hardcaml_arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-███████████████░░░░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;41.7%
+██████████████████░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;50.0%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
-0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
+0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
@@ -247,6 +247,29 @@ The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the
 I don't know how it could be done, but a better sorting & merging algorithm would be much appreciated. Sorting is not particularly hardware-friendly. Selection sort, the sorting algorithm I implemented, has a time complexity of O(n^2). If there is any possibility to sort the ranges before feeding them into the FPGA, this would prevent a lot of computation & logic complexity from happening in the first place.
 
 Another suggestion could be made about the packaging, in case we are on a quest to save every single cycle possible. The section change and EOF signals do not send any meaningful payload, but the FPGA waits for this payload to be fully sent before going forward with the signaled operation. In current implementation, the host fills the payload field with zeros. This is not even remotely the performance bottleneck of the application, but fixing it would save a couple cycles.
+
+<br><br><br></details>
+
+<details>
+<summary><b>Day 6:</b> Trash Compactor</summary><br>
+
+<h2>Day 6: Trash Compactor</h2>
+
+### Summary
+
+Like the others, the puzzle for day 6 consists of two parts. It is based on a text input that consists of a matrix of integers, followed by a final row of operation sings. (Either addition or multiplication in this case.) The integers (plus operator) that are found in the same column belong to each other and constitute an operation. (I called this union of integers and operator an "opblock".) In part 1, the integers are to be parsed left to right, whereas in part 2 they are parsed from top to bottom.
+
+### My Solution
+
+[My solution](src/day06/day06.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text", the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero proprocessing this time) one by one into the array `grid`. The source code includes some functions to index into this array as if it is a matrix. 
+
+When the host transfers the ASCII value "end of text", the FPGA moves onto the state `Find_opblk_start`. Then moving further onto the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which column the next opblock starts and ends. (Bear in mind our columns are one character wide.) Once the borders are figured out, the FPGA continues with the state `Compute`, which is where the "secondary state machines" activate simultaneously. These secondary state machines are actually the same state machine instantiated twice; they only differ in the specifics of the computation their states include. The first is for part 1, and the second is for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
+
+When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the `Find_opblk_start`-`Find_opblk_end`-`Compute` loop. After all opblocks are processed, the running totals are returned to the host.
+
+### Suggestions
+
+The current implementation is very slow for some reason. I even had to work with a smaller input sequence to be able to finish the puzzle. I will, hopefully, return back to this puzzle to improve performance. I suspect it is due to the fact that the grid is implemented as an array, which comes with a linear time complexity for indexing/reading/writing.
 
 <br><br><br></details>
 
