@@ -103,18 +103,12 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let idx_last_row = row_cnt.value -:. 1 in
   let idx_last_data_row = row_cnt.value -:. 2 in
 
-  (* the big bois *)
+  (* the big boi *)
   let grid = Array.init grid_size ~f:(fun _ -> Variable.reg spec ~width:8) in
-  let grid_t = Array.init grid_size ~f:(fun _ -> Variable.reg spec ~width:8) in
   
   let idx_into_grid ~r ~c =
     let prod = (uresize r idx_width) *: (Signal.of_int ~width:idx_width max_cols) in
     (uresize prod idx_width) +: (uresize c idx_width)
-  in
-
-  let idx_into_grid_t ~r ~c = 
-    let prod = (uresize c idx_width) *: (Signal.of_int ~width:idx_width max_rows) in
-    (uresize prod idx_width) +: (uresize r idx_width)
   in
 
   let space_sig = Signal.of_int ~width:8 (Char.to_int ' ') in
@@ -124,17 +118,8 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
     mux2 (rd ==:. 0) space_sig rd
   in
 
-  let read_grid_t ~r ~c =
-    let rd = read_array grid_t ~idx:(idx_into_grid_t ~r ~c) in
-    mux2 (rd ==:. 0) space_sig rd
-  in
-
   let write_grid ~r ~c ~data = 
     write_array grid ~idx:(idx_into_grid ~r ~c) ~data
-  in 
-
-  let write_grid_t ~r ~c ~data =
-    write_array grid_t ~idx:(idx_into_grid_t ~r ~c) ~data
   in
 
   let col_current = Variable.reg spec ~width:col_addr_width in
@@ -213,7 +198,6 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                           col <--. 0;
                         ](
                           write_grid ~r:row.value ~c:col.value ~data:uart_rx.value
-                          @ write_grid_t ~r:row.value ~c:col.value ~data:uart_rx.value
                           @ [
                             let is_ns =
                               (~:(uart_rx.value ==:. Char.to_int ' '))
@@ -367,7 +351,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                 ];
             ]);
           (Secondary_states.Retrieve,
-            let chr = read_grid_t ~r:p2_row.value ~c:p2_col.value in
+            let chr = read_grid ~r:p2_row.value ~c:p2_col.value in
             [
               when_ (is_digit chr)
                 [
@@ -383,7 +367,6 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
             ]);
           (Secondary_states.Accumulate,
             [
-
               p2_acc <--  mux2 is_op_plus.value
                             (p2_acc.value +: p2_cur.value)
                             (p2_acc.value *^: p2_cur.value);
