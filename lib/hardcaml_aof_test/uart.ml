@@ -13,8 +13,6 @@ open! Signal
 
 type t =
   {
-    cycle: unit -> unit;
-    wait: int -> unit;
     send_bit: int -> unit;
     send_byte: int -> unit;
     send_ascii_char: char -> unit;
@@ -45,4 +43,4 @@ let create ~(sim: ('i, 'o) Cyclesim.t) ~(uart_in: Bits.t ref) ~(cycles_per_bit: 
     wait cycles_per_bit;
   in
 
-  { cycle; wait; send_bit; send_byte; send_ascii_char; }
+  { send_bit; send_byte; send_ascii_char; }

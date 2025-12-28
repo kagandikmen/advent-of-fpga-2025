@@ -58,29 +58,26 @@ let%expect_test "day06_test" =
   let total_p2_out = Cyclesim.out_port ~clock_edge:Before sim "total_p2" in
   let is_done_out = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
-
-  let rec wait_until_done ~step ~max_steps =
-    if max_steps = 0 then failwith "Timeout"
-    else (
-      uart.wait step;
-      if Bits.to_bool !is_done_out then ()
-      else wait_until_done ~step ~max_steps:(max_steps-1)
-    )
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ~done_sig:is_done_out
+    ()
   in
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5;
+  sim_driver.wait 5;
   clear_in := Bits.gnd;
 
-  uart.send_byte 0x02; (* start of text in ascii-ese, but it actually doesn't matter what is sent as long as it is not printable *)
+  sim_driver.uart.send_byte 0x02; (* start of text in ascii-ese, but it actually doesn't matter what is sent as long as it is not printable *)
 
-  List.iter stream ~f:uart.send_byte;
+  List.iter stream ~f:sim_driver.uart.send_byte;
 
-  uart.send_byte 0x03; (* end of text *)
+  sim_driver.uart.send_byte 0x03; (* end of text *)
 
-  wait_until_done ~step:100 ~max_steps:200_000;
+  sim_driver.wait_until_done ~step:100 ~max_steps:200_000;
 
   let final_total_p1 = Bits.to_int !total_p1_out in
   let final_total_p2 = Bits.to_int !total_p2_out in

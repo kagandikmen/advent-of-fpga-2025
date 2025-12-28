@@ -59,17 +59,22 @@ let day03_test ~k =
   let clear_in = Cyclesim.in_port sim "clear" in
   let toj = Cyclesim.out_port ~clock_edge:Before sim "toj" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ()
+  in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5;
+  sim_driver.wait 5;
   clear_in := Bits.gnd;
 
   List.iter banks ~f:(fun bank ->
-    String.iter bank ~f:uart.send_ascii_char;
+    String.iter bank ~f:sim_driver.uart.send_ascii_char;
   );
 
   let final_toj = Bits.to_int !toj in

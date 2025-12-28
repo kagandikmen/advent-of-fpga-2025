@@ -98,15 +98,12 @@ let%expect_test "day05_test" =
   let num_covered_ids_out = Cyclesim.out_port ~clock_edge:Before sim "num_covered_ids" in
   let is_done_out = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in 
-
-  let rec wait_until_done ~step ~max_steps =
-    if max_steps = 0 then failwith "Timeout"
-    else (
-      uart.wait step;
-      if Bits.to_bool !is_done_out then ()
-      else wait_until_done ~step ~max_steps:(max_steps-1)
-    )
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ~done_sig:is_done_out
+    ()
   in
 
   let send_u64 (u64: Bits.t) =
@@ -115,22 +112,22 @@ let%expect_test "day05_test" =
       let lo = i * 8 in
       let hi = lo + 7 in
       let b = Bits.select u64 hi lo |> Bits.to_int in
-      uart.send_byte b;
+      sim_driver.uart.send_byte b;
     done;
   in
 
   let send_pkg (pkg: Package.t) =
-    uart.send_byte (Bits.to_int pkg.flag);
-    uart.wait cycles_per_bit;
+    sim_driver.uart.send_byte (Bits.to_int pkg.flag);
+    sim_driver.wait cycles_per_bit;
     send_u64 pkg.payload;
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
   in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5; 
+  sim_driver.wait 5; 
   clear_in := Bits.gnd;
 
   List.iter pkgs ~f:send_pkg;
@@ -138,7 +135,7 @@ let%expect_test "day05_test" =
   (* send eof signal *)
   send_pkg (Package.create ~flag:(bits8 0xFF) ~payload:(Bits.zero 64));
 
-  wait_until_done ~step:100 ~max_steps:20_000;
+  sim_driver.wait_until_done ~step:100 ~max_steps:20_000;
 
   let final_num_fresh = Bits.to_int !num_fresh_out in
   let final_num_covered_ids = Bits.to_int !num_covered_ids_out in

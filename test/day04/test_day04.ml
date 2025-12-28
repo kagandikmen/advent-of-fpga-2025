@@ -60,29 +60,26 @@ let day04_test ~max_passes =
   let total_rolls_collected = Cyclesim.out_port ~clock_edge:Before sim "total_rolls_collected" in
   let is_done = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
-
-  let rec wait_until_done ~step ~max_steps =
-    if max_steps = 0 then failwith "Timeout"
-    else (
-      uart.wait step;
-      if Bits.to_bool !is_done then ()
-      else wait_until_done ~step ~max_steps:(max_steps-1)
-    )
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ~done_sig:is_done
+    ()
   in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5; 
+  sim_driver.wait 5; 
   clear_in := Bits.gnd;
 
   List.iter lines ~f:(fun line ->
-    String.iter line ~f:uart.send_ascii_char;
+    String.iter line ~f:sim_driver.uart.send_ascii_char;
   );
 
-  wait_until_done ~step:1000 ~max_steps:20_000_000;
+  sim_driver.wait_until_done ~step:1000 ~max_steps:20_000_000;
 
   let final_trc = Bits.to_int !total_rolls_collected in
 

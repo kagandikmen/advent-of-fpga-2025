@@ -62,7 +62,12 @@ let%expect_test "day02_test" =
   let sum_step1 = Cyclesim.out_port ~clock_edge:Before sim "sum_step1" in
   let sum_step2 = Cyclesim.out_port ~clock_edge:Before sim "sum_step2" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ()
+  in
 
   let send_int40 (n : int) =
     let n_b0 = n land 0xFF in
@@ -71,23 +76,23 @@ let%expect_test "day02_test" =
     let n_b3 = (n lsr 24) land 0xFF in
     let n_b4 = (n lsr 32) land 0xFF in
 
-    uart.send_byte n_b0;
+    sim_driver.uart.send_byte n_b0;
     uart_in := Bits.vdd;
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
 
-    uart.send_byte n_b1;
+    sim_driver.uart.send_byte n_b1;
     uart_in := Bits.vdd;
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
 
-    uart.send_byte n_b2;
+    sim_driver.uart.send_byte n_b2;
     uart_in := Bits.vdd;
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
 
-    uart.send_byte n_b3;
+    sim_driver.uart.send_byte n_b3;
     uart_in := Bits.vdd;
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
 
-    uart.send_byte n_b4;
+    sim_driver.uart.send_byte n_b4;
     uart_in := Bits.vdd;
   in
 
@@ -95,7 +100,7 @@ let%expect_test "day02_test" =
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5;
+  sim_driver.wait 5;
   clear_in := Bits.gnd;
 
   List.iter bounds ~f:(fun field ->
@@ -103,7 +108,7 @@ let%expect_test "day02_test" =
     let hi = List.nth_exn field 1 |> Int.of_string in
     for nr = lo to hi do
       send_int40 nr;
-      uart.wait (40 * cycles_per_bit);
+      sim_driver.wait (40 * cycles_per_bit);
     done;
   );
 

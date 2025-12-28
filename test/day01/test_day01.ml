@@ -66,24 +66,29 @@ let%expect_test "day01_test" =
   let stopped_at_zero_ctr = Cyclesim.out_port ~clock_edge:Before sim "stopped_at_zero_ctr" in
   let hit_zero_ctr = Cyclesim.out_port ~clock_edge:Before sim "hit_zero_ctr" in
 
-  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
+  let sim_driver = Simulation.create
+    ~sim
+    ~uart_in
+    ~uart_cycles_per_bit:cycles_per_bit
+    ()
+  in
 
   let send_hw (n : int) = 
     let n_lsb = n land 0xFF in
     let n_msb = ((n land 0xFFFF) lsr 8) land 0xFF in
 
-    uart.send_byte n_lsb;
+    sim_driver.uart.send_byte n_lsb;
     uart_in := Bits.vdd;
     
-    uart.wait cycles_per_bit;
+    sim_driver.wait cycles_per_bit;
 
-    uart.send_byte n_msb;
+    sim_driver.uart.send_byte n_msb;
     uart_in := Bits.vdd;
   in
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  uart.wait 5;
+  sim_driver.wait 5;
   clear_in := Bits.gnd;
 
   let moves = In_channel.read_lines "input.txt"
@@ -92,7 +97,7 @@ let%expect_test "day01_test" =
 
   List.iter moves ~f:(fun v ->
     send_hw v;
-    uart.wait (40 * cycles_per_bit);
+    sim_driver.wait (40 * cycles_per_bit);
   );
 
   let final_stopped = Bits.to_int !stopped_at_zero_ctr in
