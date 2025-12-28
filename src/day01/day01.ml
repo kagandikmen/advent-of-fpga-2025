@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 1 (Step 1 & Step 2)
  * Created:     2025-12-12
- * Modified:    2025-12-14
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
@@ -11,6 +11,7 @@
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof
 open! Hardcaml_arty
 open! Signal
 

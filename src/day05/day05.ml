@@ -11,6 +11,7 @@
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof
 open! Hardcaml_arty
 open! Signal
 
@@ -39,25 +40,6 @@ module States = struct
     | Done
   [@@deriving sexp_of, compare, enumerate]
 end
-
-
-(* helper functions *)
-
-let ceil_log n = Float.iround_towards_zero_exn(Float.round_up(log(float n) /. log(2.)))
-
-let write_array (a: Always.Variable.t array) ~(idx: Signal.t) ~(data: Signal.t) =
-  let open Always in
-  List.init (Array.length a) ~f:(fun i ->
-    when_ (idx ==:. i)
-      [
-        a.(i) <-- data;
-      ])
-
-let read_array (a: Always.Variable.t array) ~(idx: Signal.t) =
-  let pick i x = mux2 (idx ==:. i) x (zero (width a.(0).value)) in
-  List.init (Array.length a) ~f:(fun i ->
-    pick i a.(i).value)
-  |> List.reduce_exn ~f:(|:)
 
 
 (* main logic*)
@@ -168,7 +150,7 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let flag_id = pkg.flag ==:. 0x04 in
   let flag_eof = pkg.flag ==:. 0xFF in
 
-  let range_count = Variable.reg spec ~width:(ceil_log max_range_count) in
+  let range_count = Variable.reg spec ~width:(Math.ceil_log2 max_range_count) in
   let ranges_lo = Array.init max_range_count ~f:(fun _ -> Variable.reg spec ~width:64) in
   let ranges_hi = Array.init max_range_count ~f:(fun _ -> Variable.reg spec ~width:64) in
   let ranges_used = Array.init max_range_count ~f:(fun _ -> Variable.reg spec ~width:1) in
@@ -177,11 +159,11 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let lo_waiting = Variable.reg spec ~width:64 in
   let have_lo_waiting = Variable.reg spec ~width:1 in
 
-  let id_count = Variable.reg spec ~width:(ceil_log max_id_count) in
-  let id_i = Variable.reg spec ~width:(ceil_log max_id_count) in
+  let id_count = Variable.reg spec ~width:(Math.ceil_log2 max_id_count) in
+  let id_i = Variable.reg spec ~width:(Math.ceil_log2 max_id_count) in
   let ids = Array.init max_id_count ~f:(fun _ -> Variable.reg spec ~width:64) in
 
-  let mrange_count = Variable.reg spec ~width:(ceil_log max_mrange_count) in
+  let mrange_count = Variable.reg spec ~width:(Math.ceil_log2 max_mrange_count) in
   let mranges_lo = Array.init max_mrange_count ~f:(fun _ -> Variable.reg spec ~width:64) in
   let mranges_hi = Array.init max_mrange_count ~f:(fun _ -> Variable.reg spec ~width:64) in
 
@@ -197,8 +179,8 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
           [
             num_covered <-- (num_covered.value +: ((cur_hi.value -: cur_lo.value) +:. 1));
           ]
-          @ write_array mranges_lo ~idx:mrange_count.value ~data:cur_lo.value
-          @ write_array mranges_hi ~idx:mrange_count.value ~data:cur_hi.value
+          @ Procedure.write_array mranges_lo ~idx:mrange_count.value ~data:cur_lo.value
+          @ Procedure.write_array mranges_hi ~idx:mrange_count.value ~data:cur_hi.value
           @ [
             mrange_count <-- (mrange_count.value +:. 1);
             have_cur <--. 0
@@ -253,9 +235,9 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
               
               when_ (pkg_valid.value &: flag_hi &: have_lo_waiting.value)
                 (
-                  write_array ranges_lo ~idx:range_count.value ~data:lo_waiting.value
-                  @ write_array ranges_hi ~idx:range_count.value ~data:pkg.payload
-                  @ write_array ranges_used ~idx:range_count.value ~data:gnd
+                  Procedure.write_array ranges_lo ~idx:range_count.value ~data:lo_waiting.value
+                  @ Procedure.write_array ranges_hi ~idx:range_count.value ~data:pkg.payload
+                  @ Procedure.write_array ranges_used ~idx:range_count.value ~data:gnd
                   @ [
                     range_count <-- (range_count.value +:. 1);
                   ]
@@ -270,7 +252,7 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
             [
               when_ (pkg_valid.value &: flag_id)
                 (
-                  write_array ids ~idx:id_count.value ~data:pkg.payload
+                  Procedure.write_array ids ~idx:id_count.value ~data:pkg.payload
                   @ [
                     id_count <-- (id_count.value +:. 1);
                   ]
@@ -289,9 +271,9 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
               when_ (scan_i.value <>: range_count.value)
                 (
                   let i = scan_i.value in
-                  let used_i = read_array ranges_used ~idx:i in
-                  let lo_i = read_array ranges_lo ~idx:i in
-                  let hi_i = read_array ranges_hi ~idx:i in
+                  let used_i = Procedure.read_array ranges_used ~idx:i in
+                  let lo_i = Procedure.read_array ranges_lo ~idx:i in
+                  let hi_i = Procedure.read_array ranges_hi ~idx:i in
                   [
                     when_ (used_i ==:. 0)
                       (
@@ -331,7 +313,7 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   let hi = scan_best_hi.value in
                   let lo = scan_best_lo.value in
                   (
-                    write_array ranges_used ~idx:scan_best_i.value ~data:vdd
+                    Procedure.write_array ranges_used ~idx:scan_best_i.value ~data:vdd
                     @ [
                       when_ (have_cur.value ==:. 0)
                         [
@@ -375,7 +357,7 @@ let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
               
               when_ (id_i.value <>: id_count.value)
                 (
-                  let is_fresh = read_array ids ~idx:id_i.value |> is_id_fresh in
+                  let is_fresh = Procedure.read_array ids ~idx:id_i.value |> is_id_fresh in
                   [
                     when_ is_fresh
                       [

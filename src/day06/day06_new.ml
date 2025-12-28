@@ -2,7 +2,7 @@
  *
  * AoF - (New) Hardcaml Solution for Day 6 (Step 1 & Step 2)
  * Created:     2025-12-26
- * Modified:    2025-12-27
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
@@ -16,6 +16,7 @@
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof
 open! Hardcaml_arty
 open! Signal
 
@@ -41,26 +42,6 @@ module Secondary_states = struct
 end
 
 let ( *^: ) (a: Signal.t) (b: Signal.t) : Signal.t = uresize (a *: b) 64
-
-let ceil_log2 n = Float.iround_towards_zero_exn(Float.round_up(log(float n) /. log(2.)))
-
-let write_array (a: Always.Variable.t array) ~(idx: Signal.t) ~(data: Signal.t) =
-  let open Always in
-  List.init (Array.length a) ~f:(fun i ->
-    when_ (idx ==:. i)
-      [
-        a.(i) <-- data;
-      ])
-
-let read_array (a: Always.Variable.t array) ~(idx: Signal.t) =
-  let pick i x = mux2 (idx ==:. i) x (zero (width a.(0).value)) in
-  List.init (Array.length a) ~f:(fun i ->
-    pick i a.(i).value)
-  |> List.reduce_exn ~f:(|:)
-
-let is_digit c = (c >=:. Char.to_int '0') &: (c <=:. Char.to_int '9')
-let ascii_digit_to_int8 c = uresize (c -:. Char.to_int '0') 8
-let mul10 (a: Signal.t) : Signal.t = (sll a 3) +: (sll a 1) 
 
 
 let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
@@ -97,9 +78,9 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let p1_sm = State_machine.create (module Secondary_states) spec in
   let p2_sm = State_machine.create (module Secondary_states) spec in
 
-  let row_addr_width = ceil_log2 max_rows in
-  let col_addr_width = ceil_log2 max_cols in
-  let idx_width = ceil_log2 grid_size in
+  let row_addr_width = Math.ceil_log2 max_rows in
+  let col_addr_width = Math.ceil_log2 max_cols in
+  let idx_width = Math.ceil_log2 grid_size in
 
   let row = Variable.reg spec ~width:row_addr_width in
   let col = Variable.reg spec ~width:col_addr_width in
@@ -257,7 +238,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                               &: (~:(uart_rx.value ==:. 0))
                             in
                             when_ is_ns
-                              (write_array is_col_filled ~idx:col.value ~data:vdd)
+                              (Procedure.write_array is_col_filled ~idx:col.value ~data:vdd)
                           ]
                           @ [
                             col <-- (col.value +:. 1)
@@ -272,7 +253,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                 [
                   sm.set_next States.Done
                 ][
-                  let is_col_current_filled = read_array is_col_filled ~idx:col_current.value in
+                  let is_col_current_filled = Procedure.read_array is_col_filled ~idx:col_current.value in
                   if_ (is_col_current_filled ==:. 0)
                     [ col_current <-- (col_current.value +:. 1) ]
                     [
@@ -290,7 +271,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   opblk_end <-- col_cnt_max.value;
                   sm.set_next States.Setup_compute;
                 ][
-                  let is_col_current_filled = read_array is_col_filled ~idx:col_current.value in
+                  let is_col_current_filled = Procedure.read_array is_col_filled ~idx:col_current.value in
                   if_ (is_col_current_filled ==:. 0)
                     [
                       opblk_end <-- col_current.value;
@@ -347,9 +328,9 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
           (Secondary_states.Retrieve,
             let chr = mux2 (ram_rdata0 ==:. 0) space_sig ram_rdata0 in
             [
-              when_ (is_digit chr)
+              when_ (Math.is_digit chr)
                 [
-                  p1_cur <-- (mul10 p1_cur.value +: uresize (ascii_digit_to_int8 chr) 64);
+                  p1_cur <-- (Math.mul10 p1_cur.value +: uresize (Math.ascii_to_int8 chr) 64);
                 ];
               
               if_ (p1_col.value +:. 1 ==: opblk_end.value)
@@ -402,9 +383,9 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
           (Secondary_states.Retrieve,
             let chr = mux2 (ram_rdata1 ==:. 0) space_sig ram_rdata1 in
             [
-              when_ (is_digit chr)
+              when_ (Math.is_digit chr)
                 [
-                  p2_cur <-- (mul10 p2_cur.value +: uresize (ascii_digit_to_int8 chr) 64);
+                  p2_cur <-- (Math.mul10 p2_cur.value +: uresize (Math.ascii_to_int8 chr) 64);
                 ];
 
               if_ (p2_row.value >=: idx_last_data_row)

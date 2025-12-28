@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 3 (Step 1 & Step 2)
  * Created:     2025-12-19
- * Modified:    2025-12-21
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
@@ -11,22 +11,12 @@
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof
 open! Hardcaml_arty
 open! Signal
 
-
-(* some common utilities *)
-
 let u64 x = uresize x 64
 let s64 x = sresize x 64
-
-let max2 a b = mux2 (a >=: b) a b
-let min2 a b = mux2 (a <=: b) a b
-
-let mul10 (x: Signal.t) : Signal.t = (Signal.sll x 3) +: (Signal.sll x 1)
-
-
-(* functions for the challenge of the day *)
 
 let least_significant_digit (digits: Signal.t list) (len: Signal.t) : Signal.t = 
   let k = List.length digits in
@@ -58,7 +48,7 @@ let pop_digits ~(digits: Signal.t list) ~(k: int) ~(len0: Signal.t) ~(drops_left
 ;;
 
 let digits_to_number (digits: Signal.t list) : Signal.t =
-  List.fold digits ~init:(zero 64) ~f:(fun acc d -> mul10 acc +: u64 d)
+  List.fold digits ~init:(zero 64) ~f:(fun acc d -> Math.mul10 acc +: u64 d)
 ;;
 
 
