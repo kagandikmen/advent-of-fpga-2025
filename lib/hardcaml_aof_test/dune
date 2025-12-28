@@ -1,0 +1,4 @@
+(library
+ (name hardcaml_aof_test)
+ (libraries core hardcaml hardcaml_arty)
+ (preprocess (pps ppx_deriving_hardcaml ppx_jane)))

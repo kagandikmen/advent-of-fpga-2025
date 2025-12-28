@@ -2,13 +2,14 @@
  *
  * AoF - Testbench for the Solution of Day 2
  * Created:     2025-12-15
- * Modified:    2025-12-15
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof_test
 open! Hardcaml_waveterm
 open! Signal
 open! Stdio
@@ -61,21 +62,7 @@ let%expect_test "day02_test" =
   let sum_step1 = Cyclesim.out_port ~clock_edge:Before sim "sum_step1" in
   let sum_step2 = Cyclesim.out_port ~clock_edge:Before sim "sum_step2" in
 
-  let cycle () = Cyclesim.cycle sim in
-  let wait c = for _ = 1 to c do cycle () done in
-
-  let send_bit b =
-    uart_in := (if b = 1 then Bits.vdd else Bits.gnd);
-    wait cycles_per_bit;
-  in
-
-  let send_byte (byte : int) =
-    send_bit 0;
-    for i = 0 to 7 do
-      send_bit ((byte lsr i) land 1)
-    done;
-    send_bit 1;
-  in
+  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
 
   let send_int40 (n : int) =
     let n_b0 = n land 0xFF in
@@ -84,23 +71,23 @@ let%expect_test "day02_test" =
     let n_b3 = (n lsr 24) land 0xFF in
     let n_b4 = (n lsr 32) land 0xFF in
 
-    send_byte n_b0;
+    uart.send_byte n_b0;
     uart_in := Bits.vdd;
-    wait cycles_per_bit;
+    uart.wait cycles_per_bit;
 
-    send_byte n_b1;
+    uart.send_byte n_b1;
     uart_in := Bits.vdd;
-    wait cycles_per_bit;
+    uart.wait cycles_per_bit;
 
-    send_byte n_b2;
+    uart.send_byte n_b2;
     uart_in := Bits.vdd;
-    wait cycles_per_bit;
+    uart.wait cycles_per_bit;
 
-    send_byte n_b3;
+    uart.send_byte n_b3;
     uart_in := Bits.vdd;
-    wait cycles_per_bit;
+    uart.wait cycles_per_bit;
 
-    send_byte n_b4;
+    uart.send_byte n_b4;
     uart_in := Bits.vdd;
   in
 
@@ -108,7 +95,7 @@ let%expect_test "day02_test" =
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  wait 5;
+  uart.wait 5;
   clear_in := Bits.gnd;
 
   List.iter bounds ~f:(fun field ->
@@ -116,7 +103,7 @@ let%expect_test "day02_test" =
     let hi = List.nth_exn field 1 |> Int.of_string in
     for nr = lo to hi do
       send_int40 nr;
-      wait(40 * cycles_per_bit);
+      uart.wait (40 * cycles_per_bit);
     done;
   );
 

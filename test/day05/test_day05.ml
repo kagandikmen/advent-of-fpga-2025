@@ -2,14 +2,14 @@
  *
  * AoF - Testbench for the Solution of Day 5
  * Created:     2025-12-24
- * Modified:    2025-12-25
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
 
 open! Core
 open! Hardcaml
-open! Hardcaml_arty
+open! Hardcaml_aof_test
 open! Hardcaml_waveterm
 open! Signal
 
@@ -98,30 +98,15 @@ let%expect_test "day05_test" =
   let num_covered_ids_out = Cyclesim.out_port ~clock_edge:Before sim "num_covered_ids" in
   let is_done_out = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
 
-  let cycle () = Cyclesim.cycle sim in
-  let wait c = for _ = 1 to c do cycle () done in
+  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in 
 
   let rec wait_until_done ~step ~max_steps =
     if max_steps = 0 then failwith "Timeout"
     else (
-      wait step;
+      uart.wait step;
       if Bits.to_bool !is_done_out then ()
       else wait_until_done ~step ~max_steps:(max_steps-1)
     )
-  in
-
-  let send_bit b =
-    uart_in := (if b = 1 then Bits.vdd else Bits.gnd);
-    wait cycles_per_bit;
-  in
-
-  let send_byte (byte: int) =
-    send_bit 0;
-    for i = 0 to 7 do
-      send_bit ((byte lsr i) land 1)
-    done;
-    send_bit 1;
-    send_bit 1;
   in
 
   let send_u64 (u64: Bits.t) =
@@ -130,22 +115,22 @@ let%expect_test "day05_test" =
       let lo = i * 8 in
       let hi = lo + 7 in
       let b = Bits.select u64 hi lo |> Bits.to_int in
-      send_byte b;
+      uart.send_byte b;
     done;
   in
 
   let send_pkg (pkg: Package.t) =
-    send_byte (Bits.to_int pkg.flag);
-    wait cycles_per_bit;
+    uart.send_byte (Bits.to_int pkg.flag);
+    uart.wait cycles_per_bit;
     send_u64 pkg.payload;
-    wait cycles_per_bit;
+    uart.wait cycles_per_bit;
   in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  wait 5; 
+  uart.wait 5; 
   clear_in := Bits.gnd;
 
   List.iter pkgs ~f:send_pkg;

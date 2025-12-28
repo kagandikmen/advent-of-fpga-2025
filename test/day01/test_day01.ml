@@ -2,13 +2,14 @@
  *
  * AoF - Testbench for the Solution of Day 1
  * Created:     2025-12-12
- * Modified:    2025-12-15
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
 
 open! Core
 open! Hardcaml
+open! Hardcaml_aof_test
 open! Hardcaml_waveterm
 open! Signal
 open! Stdio
@@ -65,41 +66,24 @@ let%expect_test "day01_test" =
   let stopped_at_zero_ctr = Cyclesim.out_port ~clock_edge:Before sim "stopped_at_zero_ctr" in
   let hit_zero_ctr = Cyclesim.out_port ~clock_edge:Before sim "hit_zero_ctr" in
 
-  let cycle () = Cyclesim.cycle sim in
-
-  let send_bit b =
-    uart_in := (if b = 1 then Bits.vdd else Bits.gnd);
-    for _ = 1 to cycles_per_bit do cycle () done
-  in
-
-  let send_byte (byte : int) =
-    send_bit 0;
-    for i = 0 to 7 do
-      send_bit ((byte lsr i) land 1)
-    done;
-    send_bit 1;
-  in
+  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
 
   let send_hw (n : int) = 
     let n_lsb = n land 0xFF in
     let n_msb = ((n land 0xFFFF) lsr 8) land 0xFF in
 
-    send_byte n_lsb;
-    uart_in := Bits.vdd; for _ = 1 to cycles_per_bit do cycle () done;
-
-    send_byte n_msb;
+    uart.send_byte n_lsb;
     uart_in := Bits.vdd;
-  in
+    
+    uart.wait cycles_per_bit;
 
-  let wait c =
-    for _ = 1 to c do cycle () done
+    uart.send_byte n_msb;
+    uart_in := Bits.vdd;
   in
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  
-  wait 5;
-
+  uart.wait 5;
   clear_in := Bits.gnd;
 
   let moves = In_channel.read_lines "input.txt"
@@ -108,7 +92,7 @@ let%expect_test "day01_test" =
 
   List.iter moves ~f:(fun v ->
     send_hw v;
-    wait (40 * cycles_per_bit);
+    uart.wait (40 * cycles_per_bit);
   );
 
   let final_stopped = Bits.to_int !stopped_at_zero_ctr in

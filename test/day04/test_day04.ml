@@ -2,14 +2,14 @@
  *
  * AoF - Testbench for the Solution of Day 4
  * Created:     2025-12-22
- * Modified:    2025-12-26
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
 
 open! Core
 open! Hardcaml
-open! Hardcaml_arty
+open! Hardcaml_aof_test
 open! Hardcaml_waveterm
 open! Signal
 
@@ -60,45 +60,26 @@ let day04_test ~max_passes =
   let total_rolls_collected = Cyclesim.out_port ~clock_edge:Before sim "total_rolls_collected" in
   let is_done = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
 
-  let cycle () = Cyclesim.cycle sim in
-  let wait c = for _ = 1 to c do cycle () done in
+  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
 
   let rec wait_until_done ~step ~max_steps =
     if max_steps = 0 then failwith "Timeout"
     else (
-      wait step;
+      uart.wait step;
       if Bits.to_bool !is_done then ()
       else wait_until_done ~step ~max_steps:(max_steps-1)
     )
-  in
-
-  let send_bit b = 
-    uart_in := (if b = 1 then Bits.vdd else Bits.gnd);
-    wait cycles_per_bit;
-  in
-
-  let send_byte (byte : int) =
-    send_bit 0;
-    for i = 0 to 7 do
-      send_bit ((byte lsr i) land 1)
-    done;
-    send_bit 1;
-  in
-
-  let send_ascii_char (c: char) =
-    send_byte (Char.to_int c);
-    wait cycles_per_bit;
   in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  wait 5; 
+  uart.wait 5; 
   clear_in := Bits.gnd;
 
   List.iter lines ~f:(fun line ->
-    String.iter line ~f:send_ascii_char;
+    String.iter line ~f:uart.send_ascii_char;
   );
 
   wait_until_done ~step:1000 ~max_steps:20_000_000;

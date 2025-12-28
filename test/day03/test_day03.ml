@@ -2,14 +2,14 @@
  *
  * AoF - Testbench for the Solution of Day 3 
  * Created:     2025-12-21
- * Modified:    2025-12-21
+ * Modified:    2025-12-28
  * Author:      Kagan Dikmen
  *
  *)
 
 open! Core
 open! Hardcaml
-open! Hardcaml_arty
+open! Hardcaml_aof_test
 open! Hardcaml_waveterm
 open! Signal
 
@@ -59,36 +59,17 @@ let day03_test ~k =
   let clear_in = Cyclesim.in_port sim "clear" in
   let toj = Cyclesim.out_port ~clock_edge:Before sim "toj" in
 
-  let cycle () = Cyclesim.cycle sim in
-  let wait c = for _ = 1 to c do cycle () done in
-
-  let send_bit b = 
-    uart_in := (if b = 1 then Bits.vdd else Bits.gnd);
-    wait cycles_per_bit;
-  in
-
-  let send_byte (byte : int) =
-    send_bit 0;
-    for i = 0 to 7 do
-      send_bit ((byte lsr i) land 1)
-    done;
-    send_bit 1;
-  in
-
-  let send_ascii_char (c: char) =
-    send_byte (Char.to_int c);
-    wait cycles_per_bit;
-  in
+  let uart = Uart.create ~sim ~uart_in ~cycles_per_bit in
 
   (* stimuli *)
 
   uart_in := Bits.vdd;
   clear_in := Bits.vdd;
-  wait 5;
+  uart.wait 5;
   clear_in := Bits.gnd;
 
   List.iter banks ~f:(fun bank ->
-    String.iter bank ~f:send_ascii_char;
+    String.iter bank ~f:uart.send_ascii_char;
   );
 
   let final_toj = Bits.to_int !toj in
