@@ -4,7 +4,7 @@
 
 This repository contains my solutions to the [Advent of FPGA 2025](https://blog.janestreet.com/advent-of-fpga-challenge-2025/) challenge from Jane Street. It implements the solutions in Hardcaml, which is an "embedded hardware design domain specific language (DSL) implemented in OCaml" [[1]](https://arxiv.org/abs/2312.15035).
 
-This repository is a fork of the [hardcaml_arty](https://github.com/fyquah/hardcaml_arty) project, which is a Hardcaml library to interface with Arty A7 boards.
+This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardcaml_arty) project, which is a Hardcaml library to interface with Arty A7 boards.
 
 ## Advent Calendar (aka Project Progress)
 
@@ -17,13 +17,17 @@ This repository is a fork of the [hardcaml_arty](https://github.com/fyquah/hardc
 ## Project Structure
 
 ```text
-src/
-└── dayXX/
-    └── dayXX.ml        # My solution for the puzzle of day XX
-test/
-└── dayXX/
+lib
+├── hardcaml_aof        # Advent of FPGA solution library
+├── hardcaml_aof_test   # Advent of FPGA testbench library
+└── hardcaml_arty       # Hardcaml Arty (for Arty A7 w/ Hardcaml)
+src
+└── dayXX
+    └── dayXX.ml        # Solution for the puzzle of day XX
+test
+└── dayXX
     ├── input.txt       # Puzzle input of the day
-    ├── ref.py          # Reference solution of the puzzle in Python
+    ├── ref.py          # Reference solution in Python
     └── test_dayXX.ml   # Testbench for the solution of the day
 ```
 
