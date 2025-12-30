@@ -8,10 +8,10 @@ This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-██████████████████░░░░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;50.0%
+█████████████████████░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;58.3%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
-0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ⬜ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
+0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
@@ -276,6 +276,41 @@ There was an [older solution](src/day06/day06_old.ml) for this puzzle where the 
 ### Suggestions
 
 I feel like the main state machine could be made more compact by removing the state `Setup_compute`. I am planning to revisit this puzzle to see if the compute setup can be moved to the `Find_opblk_end` and/or `Compute` states.
+
+Another idea would be to implement "opblock engines" for each opblock received/saved. Iterating over the rows (either during transmission or after it,) each value on the row would be sent to its dedicated opblock engine, which would both add and multiply all the operands as they come. Once the final row arrives with the correct operation, the opblock engine would then already have the result and return it immediately. 
+
+The biggest performance bottleneck of the new version of the application is the UART transmission, which consumes around 95% of the cycles. I intend to keep the UART bus for seamless FPGA deployment in the future. In case your situation allows you to opt for a parallel (or simply faster) protocol, this opblock engines idea would be worth considering.
+
+But all this under a condition: As the relation "columns per row" grows, this idea of parallel processing could prove impractical due to power and/or area concerns.
+
+<br><br><br></details>
+
+<details>
+<summary><b>Day 7:</b> Laboratories</summary><br>
+
+<h2>Day 7: Laboratories</h2>
+
+### Summary
+
+The part 1 of the seventh puzzle requires us to find how many times a beam split event happens in a given positioning of beam inputs and splitters. The second part requires the computation of how many alternative paths there are for a beam to follow from the beginning (top) until the end (bottom).
+
+### My Solution
+
+In [my solution](src/day07/day07.ml), the input text is first sent through the UART bus to the FPGA without any preprocessing. The beginning of the transmission triggers the `Idle` -> `Receive` state transition on the FPGA side, whereas the end of transmission triggers `Receive` -> `Compute`. The characters, which were saved into a 256x256 RAM in `Receive` state, are iterated over during `Compute`. At each row, the logic compares the current row with the row before, and saves both 
+
+- number of split events in that row
+- how many alternative ways there are for the beam to access each field of the current row.
+
+At the end of each row, the logic transfers to the state `Switch_rows` and then goes back to the state `Compute` for the next row. Once the `Compute`-`Switch_rows` loop is completed for every row, the FPGA concludes the computation with the states `Conclude` and `Done`, respectively. Just as usual, a done signal is raised at the end to notify the host.
+
+### Suggestions
+
+This puzzle is actually very suitable for parallel processing of the characters in a row. The moment all characters are successfully transmitted and saved, the control logic could iterate over the rows from top to bottom, and feed all the characters one-by-one to an array of "column engines." Each column engine would have a small memory keeping track of 
+
+- current presence of beam
+- number of alternative paths to arrive at that column for the current row index.
+
+However, judging by the waveform I can say that more than 95% of the cycles are spent during the UART transmission. So the row-wise + column-wise iteration is not the performance bottleneck of the application. I intend to keep the UART transmission for the sake of seamless future FPGA deployment, but in case you are fine with replacing it with some parallel/faster transmission method, this "column engines idea" could prove beneficial for you.
 
 <br><br><br></details>
 
