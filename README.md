@@ -8,10 +8,10 @@ This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-█████████████████████░░░░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;58.3%
+████████████████████████░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;66.7%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
-0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ⬜  
+0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ✅  
 0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
@@ -311,6 +311,35 @@ This puzzle is actually very suitable for parallel processing of the characters 
 - number of alternative paths to arrive at that column for the current row index.
 
 However, judging by the waveform I can say that more than 95% of the cycles are spent during the UART transmission. So the row-wise + column-wise iteration is not the performance bottleneck of the application. I intend to keep the UART transmission for the sake of seamless future FPGA deployment, but in case you are fine with replacing it with some parallel/faster transmission method, this "column engines idea" could prove beneficial for you.
+
+<br><br><br></details>
+
+<details>
+<summary><b>Day 8:</b> Playground</summary><br>
+
+<h2>Day 8: Playground</h2>
+
+### Summary
+
+For the puzzle of day 8 we have points in 3D space. And these points need to be connected starting from the shortest-distanced pair. Connected points constitute a "circuit." The first part of the puzzle asks for the sizes of three biggest circuits after a certain number of connections. The second part asks us to connect until all points are connected (directly or indirectly) and then asks for the x-coordinates of the points of the latest-connected pair.
+
+### My Solution
+
+[My solution](src/day08/day08.ml) first receives the text input through the UART connection without any host-side preprocessing. It then goes over all possible connections to compute the distances between point pairs. I used squared distances in my solution to spare costly square root logic. Because we are interested in the order of the distances only, not the real values themselves, working with squared distances does not affect correctness in this case.
+
+After all distances are computed, the FPGA sorts the connections by ascending distance. For this, I used bitonic sort because of its somewhat hardware-friendly nature. 
+
+The logic then continues by initiating the "graph," which is just two arrays in this case. The idea is similar to what I implemented in [my Python reference solution](test/day08/ref.py), which is basically [Kruskal's algorithm](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm). In this application of the algorithm, we treat the points as the vertices of a graph, and the connections between them as the edges. We use two arrays (lists in Python), both with a size equal to the number of points. The first array is called `parents` and stores the parent of each vertex. For each circuit one of the vertices is the "eldest parent" or "root," which means it directly or indirectly fathers all the other vertices in the circuit. (It actually does not matter much which vertex the root is.) The second array is called `sizes` and for each root vertex it stores the size of its circuit. For vertices that are not the root of the circuit, the size array does not store any meaningful value.
+
+After the bitonic sort, the FPGA continues by setting the graph up, and then it starts fetching the possible connections one by one, starting from the shortest-distance one. If the vertices are not already in the same circuit, their circuits are merged. Once all vertices are part of the same circuit, the FPGA concludes the computation. As usual, the host is notified for the end of computation through a done signal.
+
+### Suggestions
+
+I have to admit that this was the most difficult puzzle so far; the task does not lend itself well to hardware. Sorting is extremely costly, which is why I even needed to reduce the input to 50 points.
+
+Because part 1 asks for an intermediate state of the graph after a specific number of connections **starting from the shortest edge**, Kruskal's algorithm cannot be replaced by Prim's, Boruvka's, or reverse-delete in this case.
+
+I observed that the main performance bottleneck of the application is the sorting. Therefore, you may want to attack sorting first if you ever work on improving my design.
 
 <br><br><br></details>
 
