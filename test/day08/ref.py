@@ -1,6 +1,6 @@
 # AOF - Reference Solution for Day 8 (Part 1 & Part 2)
 # Created:      2025-12-31
-# Modified:     2025-12-31
+# Modified:     2026-01-02
 # Author:       Kagan Dikmen
 
 import sys
@@ -64,7 +64,7 @@ def main():
     edges.sort(key = return_distance)
 
     graph_1 = Graph(num_boxes)
-    for idx in range(1000):
+    for idx in range(50):
         graph_1.merge(edges[idx][1], edges[idx][2])
 
     tree_sizes = [0 for _ in range(num_boxes)]
