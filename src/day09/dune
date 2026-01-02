@@ -1,0 +1,4 @@
+(library
+ (name day09)
+ (libraries core hardcaml hardcaml_aof hardcaml_arty)
+ (preprocess (pps ppx_deriving_hardcaml ppx_jane)))
