@@ -8,11 +8,11 @@ This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-████████████████████████░░░░░░░░░░░░&nbsp;&nbsp;&nbsp;66.7%
+███████████████████████████░░░░░░░░░&nbsp;&nbsp;&nbsp;75.0%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
 0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ✅  
-0️⃣9️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
+0️⃣9️⃣ ✅ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
 
@@ -340,6 +340,70 @@ I have to admit that this was the most difficult puzzle so far; the task does no
 Because part 1 asks for an intermediate state of the graph after a specific number of connections **starting from the shortest edge**, Kruskal's algorithm cannot be replaced by Prim's, Boruvka's, or reverse-delete in this case.
 
 I observed that the main performance bottleneck of the application is the sorting. Therefore, you may want to attack sorting first if you ever work on improving my design.
+
+<br><br><br></details>
+
+<details>
+<summary><b>Day 9:</b> Movie Theater</summary><br>
+
+<h2>Day 9: Movie Theater</h2>
+
+### Summary
+
+For the puzzle of day 9 we work on a matrix of "tiles," which are either red, green, or another irrelevant color. The tiles are ordered in a way so that the red ones constitute a polygon when they are virtually connected with each other consecutively. This polygon is then, including its borders but not its corners, filled with green tiles. The first part of the puzzle asks for the area of the biggest rectangle with red tiles as two of its opposite corners. The second part adds a criteria and asks for the area of the biggest rectangle with opposite red corners and a fully red-green surface.
+
+### My Solution
+
+Here is the state machine in [my solution](src/day09/day09.ml):
+
+```ocaml
+module States = struct
+  type t =
+    | Idle
+    | Receive
+    | Find_borders
+    | Compute
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
+
+My design first receives raw text input through the UART bus (In alignment with the ASCII standard, `0x02` means start of text, and `0x03` means end of text.) The FPGA starts its execution in the `Idle` state and immediately starts listening for the start of text character. At the moment of its detection, the design transfers to the state `Receive` and starts saving received values into arrays for x and y coordinates. When the end of text character is received, the FPGA moves onto the state `Find_borders`. In this state, it iterates over all the received red tile coordinates and marks the tiles between them as "border tiles." For example, if we have the red tile constellation:
+
+```text
+..............
+......2..3....
+..............
+...0..1.......
+..............
+...5.....4....
+..............
+```
+
+It marks the tiles marked with `x` as border tiles:
+
+```text
+..............
+......2xx3....
+......x..x....
+...0xx1..x....
+...x.....x....
+...5xxxxx4....
+..............
+```
+
+The coordinates of the border tiles are saved into a single-port RAM. Once all borders are figured out, the logic transfers to the state `Compute` where it iterates over all two-combinations of the red tile set with no duplicate pairs, of course. Each pair form a virtual rectangle, and for each one of these virtual rectangles we compute:
+
+- area,
+- whether there is any border tile inside.
+
+When all combinations are finally processed, the FPGA transfers to the `Done` state and concludes the computation. As usual, the host is notified about this using a done signal.
+
+### Suggestions
+
+I think the computation in the state `Compute` can be parallelized by delegating it into "computation engines," and I don't even estimate this to be a hard task. I am planning to come back to this puzzle to do this, because the `Compute` state is by far the biggest performance bottleneck of the application.
+
+Another thing: To make testing/debugging reasonably fast, I reduced the input to 50 red tiles. However, my experience is that you can push towards the 512 red tile limit (see Hardcaml solution line 38) if you can tolerate a simulation a bit north of an hour.
 
 <br><br><br></details>
 
