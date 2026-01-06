@@ -8,11 +8,11 @@ This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardc
 
 ## Advent Calendar (aka Project Progress)
 
-███████████████████████████░░░░░░░░░&nbsp;&nbsp;&nbsp;75.0%
+██████████████████████████████░░░░░░&nbsp;&nbsp;&nbsp;83.3%
 
 0️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣2️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣3️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣4️⃣ ✅  
 0️⃣5️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣6️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣7️⃣ ✅ &nbsp;&nbsp;&nbsp; 0️⃣8️⃣ ✅  
-0️⃣9️⃣ ✅ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
+0️⃣9️⃣ ✅ &nbsp;&nbsp;&nbsp; 1️⃣0️⃣ ⬜ &nbsp;&nbsp;&nbsp; 1️⃣1️⃣ ✅ &nbsp;&nbsp;&nbsp; 1️⃣2️⃣ ⬜ 
 
 ## Project Structure
 
@@ -408,6 +408,52 @@ When all combinations are finally processed, the FPGA transfers to the `Done` st
 I think the computation in the state `Compute` can be parallelized by delegating it into "computation engines," and I don't even estimate this to be a hard task. I am planning to come back to this puzzle to do this, because the `Compute` state is by far the biggest performance bottleneck of the application.
 
 Another thing: To make testing/debugging reasonably fast, I reduced the input to 50 red tiles. However, my experience is that you can push towards the 512 red tile limit (see Hardcaml solution line 38) if you can tolerate a simulation a bit north of an hour.
+
+<br><br><br></details>
+
+<details>
+<summary><b>Day 11:</b> Reactor</summary><br>
+
+<h2>Day 11: Reactor</h2>
+
+### Summary
+
+The first part of puzzle 11 asks us to find the number of all possible paths from node `you` to `out` in a directed acyclic graph. The second part extends the criteria by asking the number of all paths from node `svr` to `out` under the condition that the path has to visit nodes `dac` and `fft` on its way, notwithstanding the order.
+
+### My Solution
+
+[My solution](src/day11/day11.ml) immediately starts listening to the UART bus for the ASCII control character "start of text." When it is finally received, the FPGA starts registering UART values as valid graph data and saves the data into a set of arrays that together serve as the adjacency matrix. When the character "end of text" is received, the FPGA accepts the graph as fully transmitted and starts processing received data to build the topological sorted order for the graph. For this, the logic uses Kahn's algorithm. Here is a nice [article](https://www.geeksforgeeks.org/dsa/topological-sorting-indegree-based-solution/?utm_source=chatgpt.com) about topo sort and Kahn's.
+
+The number of paths from source node A to target node B depends on the number of paths from "the children of A" to B. And the number of paths from the children of node A to node B depends on their children, as well. In software, this is usually implemented using recursion; but because we are in hardware, we process the topological order in reverse instead. Because no parent comes after any of its children in the topological order, crawling the order in reverse guarantees all children are fully processed before a parent node comes up. The number of paths for children are saved in an array for later consumption during the processing of their parent. Once the source node is finally arrived at, this computation is concluded.
+
+I also used a trick. The second part of the puzzle asks for the number of paths from the source node `svr` to target node `out` with the condition the nodes `dac` and `fft` need to be visited along the path. In my reference Python solution, I used a mechanism for each child node to propagate up if these nodes have been seen, but in my Hardcaml solution I did something different: This second part of the puzzle can be reduced to the first part, because:
+
+```text
+NP(svr -> dac -> fft -> out) + NP(svr -> fft -> dac -> out) = (NP(svr -> dac) * NP(dac -> fft) * NP(fft -> out)) 
+                                                            + (NP(svr -> fft) * NP(fft -> dac) * NP(dac -> out))
+
+NP: number of paths
+```
+
+So, after the topological sorted order is complete, the FPGA does three passes over this order to compute:
+
+```text
+NP(you -> out)
+NP(svr -> dac)
+NP(svr -> fft)
+NP(dac -> fft)
+NP(fft -> dac)
+NP(dac -> out)
+NP(fft -> out)
+```
+
+Finally, these values are used to compute the values required for both parts of the puzzle, and then the host is notified with a done signal.
+
+### Suggestions
+
+I am an electrical engineer; my exposure to concepts such as topological order or Kahn's algorithm does not come from a formal CS training. If you think this could be done better, either through a simpler/better implementation or through a completely different algorithm, please open an issue.
+
+As simulating hardware is very slow, I once again switched real puzzle input with a much smaller toy input.
 
 <br><br><br></details>
 
