@@ -1,7 +1,7 @@
 (library
- (name test_day02)
+ (name test_day02_new)
  (inline_tests (deps input.txt))
- (modules test_day02)
+ (modules test_day02_new)
  (libraries
    core
    day02

@@ -1,6 +1,6 @@
 (*
  *
- * AoF - Testbench for the Solution of Day 2
+ * AoF - Testbench for the Solution of Day 2 (OLD)
  * Created:     2025-12-15
  * Modified:    2025-12-28
  * Author:      Kagan Dikmen
