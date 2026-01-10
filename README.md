@@ -31,6 +31,8 @@ test
     └── test_dayXX.ml   # Testbench for the solution of the day
 ```
 
+Besides, you can refer to `src/old` and `test/old` for older solutions and their testbenches.
+
 ## Getting Started
 
 To run the tests, you must have OCaml and opam on your machine. Refer to [OCaml's official installation guide](https://ocaml.org/docs/installing-ocaml) to install them.
@@ -125,25 +127,55 @@ For each rotation, the logic computes the quotient and remainder of a division b
 
 ### Summary
 
-The puzzle of day 2 also consists of two steps. For any given range, the hardware needs to compute how many integers are in the range with a digit sequence
+The puzzle of day 2 also consists of two parts. For any given range, the hardware needs to compute how many integers are in the range with a digit sequence
 
 - that is a subsequence repeating itself twice (Step 1)
 - that is a subsequence repeating itself **at least** twice (Step 2)
 
-For further reference, I called the integers that fulfill these criteria "silly numbers" and "goofy numbers," respectively. Don't ask why :D Note that silly numbers are always a subset of goofy numbers.
-
 ### My Solution
 
-In [my solution](src/day02/day02.ml), the range bounds are first converted into 40-bit integers. The host (testbench) then sends all values in the range sequentially through UART. After arriving at the FPGA, the values are then converted into binary-coded decimal (BCD) format to enable digit processing. The function that does the conversion takes advantage of the fact that the biggest range value has 10 digits, but this is easily configurable in the source code. The logic then computes how many leading zeros the number has. After that, it is computed whether the number is silly and/or goofy. Finally, the number is added to a running total or dismissed.
+**IMPORTANT:** For further reference, I called the integers that fulfill the part 1 criteria "silly numbers." Likewise, an integer is a "goofy number" if it fulfills the criteria for part 2. Don't ask why I did this :D
+
+The state machines in [my solution](src/day02/day02.ml) are as below. `States` is the "main state machine" whereas `Compute_states` are the states of the "processing engine." Main state machine is responsible for receiving input and general execution control, whereas the compute states govern the timing with which the processing engine goes through the bounds.
+
+```ocaml
+module States = struct
+  type t =
+    | Idle
+    | Receive
+    | Compute
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+
+module Compute_states = struct
+  type t =
+    | Idle
+    | Read
+    | Init
+    | Evaluate
+    | Next
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
+
+At program start, the FPGA is in state `Idle` where it listens to the UART bus for the ASCII control character "start of text." After sending this character, the host sends the puzzle input text with no preprocessing. The flowing characters are registered as valid input data on the FPGA side, which is now in `Receive` state. The FPGA parses the incoming characters and saves the received range bounds into two FIFOs, one for lower bounds and one for upper bounds. The values are converted into binary coded decimal (BCD) before being saved. When the host sends the character "end of text," the FPGA moves onto the state `Compute` where it waits for the processing engine to complete bound processing. Once the processing engine is back in idle state, the main state machine concludes everything by moving further to its state `Done`.
+
+The moving of the processing engine out of `Idle` is triggered by the arrival of first bounds in the FIFOs. The biggest advantage here is that the processing engines don't need to wait for full input arrival. Once the first bounds are received, they can start computing while the other bounds are still being transmitted.
+
+The processing engine does not check every single integer in the range to figure out if it is silly and/or goofy. That is sometimes billions of integers to check. Therefore, the processing engine comes from the other side. It goes through all silly/goofy numbers and checks if they are in the given integer range. This is done in state `Evaluate` of the processing engine, and it has proven to be the faster approach.
+
+In my [older solution](src/old/day02/day02.ml) for this puzzle, I was:
+
+- turning range bounds into 40 bit integers on the host side,
+- iterating over all the integers in the range on the host side, sending every single one through UART,
+- computing on the FPGA (no state machine) if the latest-received integer is silly/goofy.
+
+Horrible solution, I know. The new one is incomparably better.
 
 ### Suggestions
 
-Instead of sending all values in the range one after another, an implementation that can iterate in the hardware would be more efficient. For this,
-
-- an FSM
-- logic to increment BCD
-
-need to be added to the implementation.
+Because the UART transmission continues running "in the background" while the first ranges are already being processed, the UART transmission is not the performance bottleneck in this application. The by far longest chunk of execution is the evaluation state of the processing engine. Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. In the end, the set of all silly/goofy numbers does not change from range to range. However, I don't know what kind of effect this would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify it. You can try this out and let me know, don't hesitate to create an issue or pull request.
 
 <br><br><br></details>
 
@@ -269,13 +301,13 @@ Like the others, the puzzle for day 6 consists of two parts. It is based on a te
 
 ### My Solution
 
-[My solution](src/day06/day06_new.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text," the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero preprocessing this time) one by one in its RAM.
+[My solution](src/day06/day06.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text," the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero preprocessing this time) one by one in its RAM.
 
 When the host transfers the ASCII value "end of text," the FPGA moves onto the state `Find_opblk_start`. Then moving further onto the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which column the next opblock starts and ends. (Bear in mind our columns are one character wide.) Once the borders are figured out, the FPGA continues with the states `Setup_compute` and `Compute`, the latter of which activates the "secondary state machines." These secondary state machines are another type of state machine, which we instantiate twice. They work simultaneously; and they only differ in the specifics of the computation one of their states includes. The first state machine is for part 1, and the second is for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
 
 When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the loop: `Find_opblk_start`-`Find_opblk_end`-`Setup_compute`-`Compute`. After all opblocks are processed this way, the running totals are returned to the host.
 
-There was an [older solution](src/day06/day06_old.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. As it takes linear time to index, read, or write to arrays, this older implementation was embarrassingly slow. The random access into the "character memory" as offered by the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour.
+There was an [older solution](src/old/day06/day06.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. As it takes linear time to index, read, or write to arrays, this older implementation was embarrassingly slow. The random access into the "character memory" as offered by the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour.
 
 ### Suggestions
 
