@@ -47,7 +47,7 @@ let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_rows = 8 in
-  let max_cols = 4096 in
+  let max_cols = 32 in
   let grid_size = max_rows * max_cols in
 
   let uart_rx = Uart.Expert.create_rx_state_machine

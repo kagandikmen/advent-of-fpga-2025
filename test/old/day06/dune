@@ -1,10 +1,10 @@
 (library
- (name test_day02)
+ (name test_day06_old)
  (inline_tests (deps input.txt))
- (modules test_day02)
+ (modules test_day06)
  (libraries
    core
-   day02
+   day06_old
    hardcaml
    hardcaml_aof_test
    hardcaml_waveterm

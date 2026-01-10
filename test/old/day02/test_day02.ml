@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 2 (OLD)
  * Created:     2025-12-15
- * Modified:    2025-12-28
+ * Modified:    2026-01-10
  * Author:      Kagan Dikmen
  *
  *)
@@ -36,7 +36,7 @@ let%expect_test "day02_test" =
   let clear = input "clear" 1 in 
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let sum_step1, sum_step2 = Day02.create_addition_logic
+  let sum_step1, sum_step2 = Day02_old.Day02.create_addition_logic
     ~clock
     ~clear
     ~cycles_per_bit
