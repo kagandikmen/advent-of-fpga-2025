@@ -32,6 +32,7 @@ end
 module Compute_states = struct
   type t =
     | Idle
+    | Read
     | Init
     | Evaluate
     | Next
@@ -437,14 +438,19 @@ let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   fifo_lo_rd_en <--. 1;
                   fifo_hi_rd_en <--. 1;
                   case_idx <--. 0;
-                  csm.set_next Compute_states.Init; 
+                  
+                  csm.set_next Compute_states.Read; 
                 ];
             ]);
-          (Compute_states.Init,
+          (Compute_states.Read,
             [
               range_lo <-- fifo_lo_rd_data;
               range_hi <-- fifo_hi_rd_data;
 
+              csm.set_next Compute_states.Init;
+            ]);
+          (Compute_states.Init,
+            [
               m_r <-- case_m case_idx.value;
               r_r <-- case_r case_idx.value;
               add1_r <-- case_add1 case_idx.value;
@@ -608,6 +614,7 @@ let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let fifo_hi_rd_en_value = fifo_hi_rd_en.value -- "fifo_hi_rd_en" in
   let fifo_hi_rd_data_value = fifo_hi_rd_data -- "fifo_hi_rd_data" in
   let is_csm_st_idle = (csm.is Compute_states.Idle) -- "is_csm_st_idle" in
+  let is_csm_st_read = (csm.is Compute_states.Read) -- "is_csm_st_read" in
   let is_csm_st_init = (csm.is Compute_states.Init) -- "is_csm_st_init" in
   let is_csm_st_eval = (csm.is Compute_states.Evaluate) -- "is_csm_st_eval" in
   let is_csm_st_next = (csm.is Compute_states.Next) -- "is_csm_st_next" in
@@ -635,6 +642,7 @@ let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
         fifo_hi_rd_data_value;
         fifo_hi_wr_data_value;
         is_csm_st_idle;
+        is_csm_st_read;
         is_csm_st_init;
         is_csm_st_eval;
         is_csm_st_next;
