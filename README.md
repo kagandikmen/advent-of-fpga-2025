@@ -367,21 +367,55 @@ The part 1 of the seventh puzzle requires us to find how many times a beam split
 
 ### My Solution
 
-In [my solution](src/day07/day07.ml), the input text is first sent through the UART bus to the FPGA without any preprocessing. The beginning of the transmission triggers the `Idle` -> `Receive` state transition on the FPGA side, whereas the end of transmission triggers `Receive` -> `Compute`. The characters, which were saved into a 256x256 RAM in `Receive` state, are iterated over during `Compute`. At each row, the logic compares the current row with the row before, and saves both 
+The state machines in [my solution](src/day07/day07.ml) are as follows:
 
-- number of split events in that row
-- how many alternative ways there are for the beam to access each field of the current row.
+```ocaml
+module States = struct
+  type t =
+    | Idle
+    | Receive
+    | Compute
+    | Conclude
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
 
-At the end of each row, the logic transfers to the state `Switch_rows` and then goes back to the state `Compute` for the next row. Once the `Compute`-`Switch_rows` loop is completed for every row, the FPGA concludes the computation with the states `Conclude` and `Done`, respectively. Just as usual, a done signal is raised at the end to notify the host.
+module Compute_states = struct
+  type t =
+    | Idle
+    | Compute_row
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
+
+In terms of general control logic, this solution is similar to what you will find in solutions for day 1 and 2. `States` lists the states of the main state machine. `Compute_states` are the states of the "compute engine" for the row processing logic which runs in parallel.
+
+The main state machine starts at state `Idle` and listens to the UART bus for the ASCII control character "start of text." When it is received, the main state machine transfers to the state `Receive` where it starts registering UART input as valid puzzle data. At each line break, it saves the received row data into a FIFO, one bit for each character. (Zero for space, one for splitter.) This FIFO is 256 bits wide, so the design can work with column counts less than or equal to 256. The FPGA continues receiving and saving until the control character for "end of text" is received. Then, it transfers to the state `Compute` where it waits for the compute engine to complete. After that, it concludes the entire computation (`Conclude`) and finally finishes. (`Done`)
+
+The compute engine, which has the simple state machine `Idle` <-> `Compute_row`, fulfills the function of reading latest row from the FIFO, analyzing it, and updating various registers to keep track of the current state of the computation. It sits idle while the FIFO is empty, whereas it transfers to `Compute_row` when there is any row data in the FIFO.
+
+This approach with two state machines enables a great deal of parallelism. The rows are processed as they come; they are not first saved and then processed in bulk, which would cost a lot of performance and area. Moreover, the compute engine processes all columns of the row in parallel (by taking account of what happens in the neighbor columns), which also brings about a great deal of performance gains. This way, the entire row is processed in a single cycle!
+
+In fact, I had an [older solution](src/old/day07/day07.ml) for this puzzle where I used to:
+
+- first save all the puzzle input into a 142x142 grid,
+- wait for all of the input to be fully received and saved,
+- then iterate over all the rows and columns one cell at a time.
+
+This was of course neither an elegant solution nor efficient. The performance comparison of the older and newer solutions are as follows:
+
+|           | Total Time (us) | Time After End of Receive (us) |
+|-----------|-----------------|--------------------------------|
+| **Old**   | 9075            | 202.02                         |
+| **New**   | 8874            | 1.02                           |
+
+Because the total execution is dominated by the UART transmission, the total time is reduced by 2% only. However, the time spent after the UART transmission is reduced by 99.5% with the newer solution.
 
 ### Suggestions
 
-This puzzle is actually very suitable for parallel processing of the characters in a row. The moment all characters are successfully transmitted and saved, the control logic could iterate over the rows from top to bottom, and feed all the characters one-by-one to an array of "column engines." Each column engine would have a small memory keeping track of 
+The table above displays very well what the main performance bottleneck of the application is: the UART transmission. I will keep the UART bus because one of my main design goals is FPGA deployability, but feel free to attack the data transmission if you are bound by different concerns and constraints. You may need to adjust the FIFO depth in case your transmission bandwidth is higher.
 
-- current presence of beam
-- number of alternative paths to arrive at that column for the current row index.
-
-However, judging by the waveform I can say that more than 95% of the cycles are spent during the UART transmission. So the row-wise + column-wise iteration is not the performance bottleneck of the application. I intend to keep the UART transmission for the sake of seamless future FPGA deployment, but in case you are fine with replacing it with some parallel/faster transmission method, this "column engines idea" could prove beneficial for you.
+One of the great things about this solution is that it actually does not put any limit on how many rows the input text is allowed to have. The AoC puzzle input has 142 rows like it has 142 columns, but the Hardcaml solution is able to continue until its 64-bit `cur_rays` registers or result registers are overflowed.
 
 <br><br><br></details>
 
