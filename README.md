@@ -241,33 +241,43 @@ The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in t
 
 [My solution](src/day04/day04.ml) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
 
-- **LOAD**: In this state, all field info is transmitted to the FPGA via UART. The dots and ats are transmitted in ASCII format without any host processing. The FPGA receives and stores them one by one into a 140x140 grid. Each cell of the grid has the following contents:
+- **LOAD**: In this state, all field info is loaded onto the FPGA. The puzzle input is transmitted by the host through the UART bus with zero preprocessing. If the FPGA registers the inflowing 8-bit value as a valid ASCII character, it stores it in a 140x140 grid storage. Each "cell" of the grid has the following structure:
 
 ```ocaml
 module Cell = struct
   type 'a t =
   {
     is_roll: 'a;
-    is_accessible: 'a;
+    removed_this_pass: 'a;
   }
 
   ...
 end
 ```
 
-Both `is_roll` and `is_accessible` are 1-bit wide. The state LOAD only writes `is_roll` though, `is_accessible` is computed in the state MARK. After the loading of all fields is complete, the FSM continues with the state MARK.
+Both `is_roll` and `removed_this_pass` are 1-bit wide. The state LOAD only writes `is_roll` though, `removed_this_pass` is modified in the state REMOVE. After the loading of all input fields is complete, the FSM continues with the other states.
 
-- **MARK**: This state iterates over all cells, computes their accessibility, and sets their `is_accessible` field accordingly. An accessible cell is a cell that has less than 4 neighbors occupied by paper rolls. Once all cells are iterated, the FSM continues onto the state REMOVE.
-- **REMOVE**: This state iterates over all cells once again, and sets their `is_roll` field zero if they are both occupied by a roll and set accessible by the MARK state. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of MARK-REMOVE iterations is achieved. If yes, then the FSM moves onto DONE. If not, then it returns back to MARK for another iteration. For the case where `max_passes` is set to zero, the MARK-REMOVE loop continues forever until there are no more rolls to remove. The number of removed rolls is accumulated in the register `total_removed`.
-- **DONE**: This is the state the logic arrives at after breaking from the MARK-REMOVE loop. The FPGA signals back to the host that the computation is done, so the host knows that `total_removed` is stabilized.
+- **SWITCH**: This state takes up only one cycle and acts as an "bookkeeping step" after each remove pass is completed. If it is preceded by the state LOAD it fulfills no significant functionality.
+- **REMOVE**: This state iterates over all cells, and sets their `is_roll` field zero if they are both occupied by a roll and can be accessed according to the rules of the puzzle. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of remove passes is achieved. If so, then the FSM moves onto DONE. If not, then it returns back to SWITCH for the evaluation of the current remove pass and the transition to the next one. The number of removed rolls is accumulated in the register `total_removed`.
+- **DONE**: This is the state the logic arrives at after breaking from the REMOVE-SWITCH loop. The FPGA signals back to the host that the computation is done, so the host knows that `total_removed` is stabilized.
 
-`max_passes` is not a compile-time constant. It is implemented as an input signal to the FPGA. I presume it would be fairly easy to make it a compile-time constant, though.
+If `max_passes` is set to zero, the remove passes continue forever until there are no more rolls to remove. For the first part of the puzzle, `max_passes` is set to one. For the second part, it is set to zero.
 
-The grid dimensions are a compile-time constant. That each cell is implemented as a 2-bit field helps minimize the memory footprint.
+In my [older solution](src/old/day04/day04.ml) for this puzzle, I was:
+
+- first saving all the values into the grid likewise (LOAD)
+- then going through all the cells of the grid to mark the cells 'accessible' or not (MARK)
+- then going through all the cells once again to remove the rolls in the cells marked accessible (REMOVE)
+
+Because this involved iterating twice over the grid for each remove pass, it was very inefficient and significantly slower. After moving to this new solution I have seen a 9.4% acceleration for the first part of the puzzle and a 36.5% acceleration for the second part.
 
 ### Suggestions
 
-The algorithm in itself is unfortunately not very hardware-friendly. The 140x140 grid is therefore a necessity rather than a design choice. To improve performance, another algorithm could be implemented to keep track of the roll removals of the previous row. This would enable the two states MARK and REMOVE to be merged together, resulting in sizeable performance boost.
+Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the 140x140 grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so I don't estimate any excessive memory/area footprint for my solution.
+
+The waveforms reveal that the biggest performance bottleneck of the application is the UART transmission, but I intend to keep the UART bus as FPGA deployability is one of my main design goals.
+
+What I especially like about this solution is that it is actually in no way tailored to part 1 or 2 of the puzzle. If you are curious about how many rolls are removed after three remove passes, just set `max_passes` three!
 
 <br><br><br></details>
 
