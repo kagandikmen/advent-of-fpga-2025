@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 7
  * Created:     2025-12-28
- * Modified:    2025-12-30
+ * Modified:    2026-01-11
  * Author:      Kagan Dikmen
  *
  *)
@@ -27,7 +27,7 @@ let%expect_test "day07_test" =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let total_splits, total_paths, is_done = Day07.create_day07_logic
+  let total_splits, total_paths, is_done, debug_output = Day07.create_day07_logic
     ~clock
     ~clear
     ~cycles_per_bit
@@ -40,6 +40,7 @@ let%expect_test "day07_test" =
       output "total_splits" total_splits;
       output "total_paths" total_paths;
       output "is_done" is_done;
+      output "debug_output" debug_output;
     ]
   in
 
@@ -54,6 +55,7 @@ let%expect_test "day07_test" =
   let total_splits_out = Cyclesim.out_port ~clock_edge:Before sim "total_splits" in
   let total_paths_out = Cyclesim.out_port ~clock_edge:Before sim "total_paths" in
   let is_done_out = Cyclesim.out_port ~clock_edge:Before sim "is_done" in
+  let _dbg_out = Cyclesim.out_port ~clock_edge:Before sim "debug_output" in
 
   let sim_driver = Simulation.create
     ~sim

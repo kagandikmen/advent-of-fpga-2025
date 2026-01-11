@@ -1,8 +1,8 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 7 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 7 (NEW)
  * Created:     2025-12-28
- * Modified:    2025-12-30
+ * Modified:    2026-01-11
  * Author:      Kagan Dikmen
  *
  *)
@@ -20,19 +20,102 @@ module States = struct
     | Idle
     | Receive
     | Compute
-    | Switch_rows
     | Conclude
     | Done
   [@@deriving sexp_of, compare, enumerate]
 end
 
+module Compute_states = struct
+  type t =
+    | Idle
+    | Compute_row
+  [@@deriving sexp_of, compare, enumerate]
+end
+
+module Fifo_256 = struct
+  let create ~clock ~clear ~depth ~(wr_en: Signal.t) ~(wr_data: Signal.t) ~(rd_en: Signal.t) =
+    let open Always in
+
+    let spec = Reg_spec.create ~clock ~clear () in
+
+    let addr_w = Math.ceil_log2 depth in
+    let cnt_w = addr_w + 1 in
+
+    let wr_ptr = Variable.reg spec ~width:addr_w in
+    let rd_ptr = Variable.reg spec ~width:addr_w in
+    let count = Variable.reg spec ~width:cnt_w in
+
+    let empty = (count.value ==:. 0) in
+    let full = (count.value ==:. depth) in
+
+    let do_wr = wr_en &: ~:full in
+    let do_rd = rd_en &: ~:empty in
+
+    let waddr = Variable.wire ~default:(zero addr_w) in
+    let raddr = Variable.wire ~default:(zero addr_w) in
+    let we = Variable.wire ~default:gnd in
+    let wdata = Variable.wire ~default:(zero 256) in
+
+    let write_port : Signal.write_port =
+      {
+        write_clock = clock;
+        write_enable = we.value;
+        write_address = waddr.value;
+        write_data = wdata.value;
+      }
+    in
+
+    let read_port : Signal.read_port =
+      { 
+        read_clock = clock;
+        read_enable = vdd;
+        read_address = raddr.value;
+      }
+    in
+
+    let ram =
+      Ram.create
+        ~collision_mode:Read_before_write
+        ~size:depth
+        ~write_ports:[| write_port |]
+        ~read_ports:[| read_port |]
+        ()
+    in
+
+    let rd_data = ram.(0) in
+
+    let delta = (mux2 do_wr (one cnt_w) (zero cnt_w)) -: (mux2 do_rd (one cnt_w) (zero cnt_w)) in
+
+    compile
+      [
+        we <--. 0;
+        waddr <-- wr_ptr.value;
+        wdata <-- wr_data;
+        raddr <-- rd_ptr.value;
+
+        when_ do_wr
+          [
+            we <--. 1;
+            waddr <-- wr_ptr.value;
+            wdata <-- wr_data;
+            wr_ptr <-- (wr_ptr.value +:. 1);
+          ];
+
+        when_ do_rd
+          [
+            rd_ptr <-- (rd_ptr.value +:. 1);
+          ];
+
+        count <-- (count.value +: delta);
+      ];
+    
+    rd_data, empty, full
+end
 
 let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
-  let max_rows = 256 in
-  let max_cols = 256 in
-  let grid_size = max_rows * max_cols in
+  let fifo_depth = 2 in
 
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
@@ -40,9 +123,6 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
     ~cycles_per_bit
     uart_rx_value
   in
-
-  let _uart_value = uart_rx.value -- "uart_value" in
-  let _uart_valid = uart_rx.valid -- "uart_valid" in
 
   let spec = Reg_spec.create
     ~clock
@@ -53,94 +133,32 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let total_splits = Variable.reg spec ~width:64 in
   let total_paths = Variable.reg spec ~width:64 in
 
-  let _total_splits_value = total_splits.value -- "total_splits_value" in
-  let _total_paths_value = total_paths.value -- "total_paths_value" in
-
   let sm = State_machine.create (module States) spec in
+  let csm = State_machine.create (module Compute_states) spec in
 
-  let row_addr_width = Math.ceil_log2 max_rows in
-  let col_addr_width = Math.ceil_log2 max_cols in
-  let addr_width = Math.ceil_log2 grid_size in
+  let fifo_wr_en = Variable.wire ~default:gnd in
+  let fifo_wr_data = Variable.wire ~default:(zero 256) in
+  let fifo_rd_en = Variable.wire ~default:gnd in
 
-  let row = Variable.reg spec ~width:row_addr_width in (* current row idx *)
-  let col = Variable.reg spec ~width:col_addr_width in (* current col idx *)
-  let row_cnt = Variable.reg spec ~width:row_addr_width in (* #rows *)
-  let col_cnt = Variable.reg spec ~width:col_addr_width in (* #cols *)
-
-  let s_col = Variable.reg spec ~width:col_addr_width in
-
-  let idx_last_row = row_cnt.value -:. 1 in
-  let idx_last_col = col_cnt.value -:. 1 in
-
-  let ram_raddr = Variable.wire ~default:(zero addr_width) in
-  let ram_waddr = Variable.wire ~default:(zero addr_width) in
-  let ram_we = Variable.wire ~default:gnd in
-  let ram_wdata = Variable.wire ~default:(zero 8) in
-
-  let ram_write_port : Signal.write_port =
-    {
-      write_clock = clock;
-      write_enable = ram_we.value;
-      write_address = ram_waddr.value;
-      write_data = ram_wdata.value;
-    }
-  in 
-
-  let ram_read_port : Signal.read_port =
-    {
-      read_clock = clock;
-      read_enable = vdd;
-      read_address = ram_raddr.value;
-    }
-  in 
-
-  let ram_rdata = Ram.create
-    ~collision_mode:Read_before_write
-    ~size:grid_size
-    ~write_ports:[| ram_write_port; |]
-    ~read_ports: [| ram_read_port; |]
-    ()
+  let fifo_rd_data, fifo_empty, _fifo_full = Fifo_256.create
+    ~clock
+    ~clear
+    ~depth:fifo_depth
+    ~wr_en:fifo_wr_en.value
+    ~wr_data:fifo_wr_data.value
+    ~rd_en:fifo_rd_en.value
   in
 
-  let ram_rdata0 = ram_rdata.(0) in   (* ram_rdata is still an array *)
+  let done_ctr = Variable.reg spec ~width:8 in
+  let done_th = 100 in
 
-  let idx_into_grid ~r ~c =
-    let prod = (uresize r addr_width) *: (Signal.of_int ~width:addr_width max_cols) in
-    (uresize prod addr_width) +: (uresize c addr_width)
-  in 
+  let is_etx_received = Variable.reg spec ~width:1 in
 
-  let read_grid ~r ~c =
-    ram_raddr <-- (idx_into_grid ~r ~c);
-  in
+  let cur_receive = Variable.reg spec ~width:256 in
+  let rcv_first_row = Variable.reg spec ~width:1 in
+  let rcv_idx = Variable.reg spec ~width:8 in
 
-  let write_ram ~(addr: Signal.t) ~(data: Signal.t) =
-    [
-      ram_we <--. 1;
-      ram_waddr <-- addr;
-      ram_wdata <-- data;
-    ]
-  in
-
-  let write_grid ~r ~c ~data = 
-    write_ram ~addr:(idx_into_grid ~r ~c) ~data
-  in 
-
-  let s_ascii = Char.to_int 'S' in
-  let tick_ascii = Char.to_int '^' in
-  let _dot_ascii = Char.to_int '.' in
-  let nl_ascii = Char.to_int '\n' in
-
-  let row_l = Array.init max_cols ~f:(fun _ -> Variable.reg spec ~width:64) in
-  let row_n = Array.init max_cols ~f:(fun _ -> Variable.reg spec ~width:64) in
-
-  let copy_array ~(target: Always.Variable.t array) ~(source: Always.Variable.t array) =
-    if (Array.length target) <> (Array.length source) then failwith "Error 10001"
-    else (
-      List.init (Array.length target) ~f:(fun i ->
-        target.(i) <-- source.(i).value;
-        )
-      )
-  in
+  let cur_rays = Array.init 256 ~f:(fun _ -> Variable.reg spec ~width:64) in
 
   let zero_out_array (target: Always.Variable.t array) =
     List.init (Array.length target) ~f:(fun i -> 
@@ -153,19 +171,11 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
     Procedure.write_array target ~idx ~data:(present +: data)
   in
 
-  let done_ctr = Variable.reg spec ~width:8 in
-  let done_th = 100 in
-
-  let row_o = Variable.reg spec ~width:row_addr_width in
-  let col_o = Variable.reg spec ~width:col_addr_width in
-  
-  let is_rdata_valid = Variable.reg spec ~width:1 in
-
   compile
     [
-      ram_we <--. 0;
-      ram_waddr <--. 0;
-      ram_wdata <--. 0;
+      fifo_wr_en <--. 0;
+      fifo_rd_en <--. 0;
+      fifo_wr_data <--. 0;
 
       sm.switch
         [
@@ -173,7 +183,20 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
             [
               when_ uart_rx.valid
                 [
-                  if_ (uart_rx.value ==:. 0x02) [ sm.set_next States.Receive; ][ sm.set_next States.Idle; ]
+                  when_ (uart_rx.value ==:. 0x02) 
+                    [ 
+                      is_etx_received <--. 0;
+
+                      proc (zero_out_array cur_rays);
+
+                      total_splits <--. 0;
+                      total_paths <--. 0;
+                      cur_receive <--. 0;
+                      rcv_first_row <--. 1;
+                      rcv_idx <--. 0;
+
+                      sm.set_next States.Receive; 
+                    ];
                 ];
             ]);
           (States.Receive,
@@ -182,104 +205,56 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                 [
                   if_ (uart_rx.value ==:. 0x03)
                     [
-                      row_cnt <-- (row.value +:. 1);
-                      
-                      proc (zero_out_array row_l);
-                      proc (zero_out_array row_n);
+                      is_etx_received <--. 1;
 
-                      proc (Procedure.write_array row_l ~idx:s_col.value ~data:(one 64));
-
-                      row <--. 1;
-                      col <--. 0;
-
-                      row_o <--. 0;
-                      col_o <--. 0;
+                      fifo_wr_en <--. 1;
+                      fifo_wr_data <-- cur_receive.value;
 
                       sm.set_next States.Compute;
                     ][
-                      if_ (uart_rx.value ==:. nl_ascii)
+                      if_ rcv_first_row.value
                         [
-                          when_ (col.value >: col_cnt.value) [ col_cnt <-- col.value; ];
-                          row <-- (row.value +:. 1);
-                          col <--. 0;
+                          when_ (uart_rx.value ==:. Char.to_int 'S')
+                            [
+                              proc (add_to_array cur_rays ~idx:rcv_idx.value ~data:(one 64));
+                              rcv_first_row <--. 0;
+                            ];
+                          
+                          rcv_idx <-- (rcv_idx.value +:. 1);
                         ][
-                          proc (write_grid ~r:row.value ~c:col.value ~data:uart_rx.value);
-                          col <-- (col.value +:. 1);
-                          when_ (uart_rx.value ==:. s_ascii) [ s_col <-- col.value; ];
-                        ]
-                    ]
+                          if_ (uart_rx.value ==:. Char.to_int '^')
+                            [
+                              cur_receive <-- ((select cur_receive.value 254 0) @: one 1);
+                            ][
+                              cur_receive <-- ((select cur_receive.value 254 0) @: zero 1);
+                            ];
+                          
+                          when_ (uart_rx.value ==:. Char.to_int '\n')
+                            [
+                              fifo_wr_en <--. 1;
+                              fifo_wr_data <-- cur_receive.value;
+                              cur_receive <--. 0;
+                            ];
+                        ];
+                    ];
                 ];
             ]);
           (States.Compute,
-            let is_eor = Variable.wire ~default:gnd in  (* end of row *)
             [
-              read_grid ~r:row.value ~c:col.value;
-
-              when_ (is_rdata_valid.value ==:. 1)
-                (
-                  let q = Procedure.read_array row_l ~idx:col_o.value in
-                  [
-                    if_ (ram_rdata0 ==:. tick_ascii)
-                      [
-                        total_splits <-- (total_splits.value +: uresize (q >:. 0) 64);
-                        when_ (col_o.value >:. 0) [ proc (add_to_array row_n ~idx:(col_o.value -:. 1) ~data:q); ];
-                        when_ (col_o.value <: idx_last_col) [ proc (add_to_array row_n ~idx:(col_o.value +:. 1) ~data:q)];
-                      ][
-                        proc(add_to_array row_n ~idx:col_o.value ~data:q);
-                      ];
-
-                    when_ (col_o.value ==: idx_last_col)
-                      [
-                        is_eor <--. 1;
-                        sm.set_next States.Switch_rows;
-                      ]
-                  ]
-                );
-              
-              when_ (is_eor.value ==:. 0)
-                [
-                  is_rdata_valid <--. 1;
-
-                  row_o <-- row.value;
-                  col_o <-- col.value;
-
-                  if_ (col.value ==: idx_last_col)
-                    [ row <-- (row.value +:. 1); col <--. 0; ]
-                    [ col <-- (col.value +:. 1); ];
-                ]
-            ]);
-          (States.Switch_rows,
-            let final_row_done = is_rdata_valid.value &: (row_o.value ==: idx_last_row) &: (col_o.value ==: idx_last_col) in
-            [
-              proc (copy_array ~target:row_l ~source:row_n);
-              proc (zero_out_array row_n);
-
-              if_ final_row_done
-                [
-                  total_paths <--. 0;
-                  col <--. 0;
-                  is_rdata_valid <--. 0;
-                  sm.set_next States.Conclude;
-                ][
-                  row_o <-- (row.value +:. 1);
-                  col_o <--. 0;
-                  is_rdata_valid <--. 1;
-                  sm.set_next States.Compute;
-
-                  if_ (col.value ==: idx_last_col)
-                    [ row <-- (row.value +:. 1); col <--. 0; ]
-                    [ col <-- (col.value +:. 1); ];
-                ]
+              when_ (is_etx_received.value &: fifo_empty &: (csm.is Compute_states.Idle))
+                [ sm.set_next States.Conclude; ]
             ]);
           (States.Conclude,
-            let final_row_char = Procedure.read_array row_l ~idx:col.value in
+            let num_paths =
+              cur_rays
+              |> Array.to_list
+              |> List.map ~f:(fun v -> v.value)
+              |> List.fold ~init:(zero 64) ~f:(+:)
+            in
             [
-              total_paths <-- (total_paths.value +: final_row_char);
-
-              if_ (col.value ==: idx_last_col) 
-                [ sm.set_next States.Done; ]
-                [ col <-- (col.value +:. 1); ]
-            ]);
+              total_paths <-- num_paths;
+              sm.set_next States.Done;
+            ]);  
           (States.Done,
             [
               done_ctr <-- (done_ctr.value +:. 1);
@@ -289,8 +264,71 @@ let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
                   sm.set_next States.Idle;
                 ];
             ]);
-        ]
+        ];
+
+      csm.switch
+        [
+          (Compute_states.Idle,
+            [
+              when_ (~:fifo_empty)
+                [
+                  fifo_rd_en <--. 1;
+                  csm.set_next Compute_states.Compute_row;
+                ]
+            ]);
+          (Compute_states.Compute_row,
+            let cur_row = fifo_rd_data in
+
+            let cur_ray_value i = cur_rays.(i).value in
+            let is_splitter i = bit cur_row i in
+
+            let next_rays =
+              Array.init 256 ~f:(fun i ->
+                let self =
+                  mux2 (is_splitter i) (zero 64) (cur_ray_value i)
+                in
+                let from_left =
+                  if i = 0 then (zero 64)
+                  else mux2 (is_splitter (i - 1)) (cur_ray_value (i - 1)) (zero 64)
+                in
+                let from_right =
+                  if i = 255 then (zero 64)
+                  else mux2 (is_splitter (i + 1)) (cur_ray_value (i + 1)) (zero 64)
+                in
+                self +: from_left +: from_right)
+            in
+
+            let split_events =
+              List.init 256 ~f:Fn.id
+              |> List.map ~f:(fun i -> mux2 ((cur_ray_value i >:. 0) &: is_splitter i) (one 64) (zero 64))
+              |> List.fold ~init:(zero 64) ~f:(+:)
+            in
+            [
+              proc (
+                List.init 256 ~f:(fun i ->
+                  cur_rays.(i) <-- next_rays.(i)
+                )
+              );
+
+              total_splits <-- (total_splits.value +: split_events);
+              csm.set_next Compute_states.Idle;
+            ]);
+        ];
     ];
 
-  total_splits.value, total_paths.value, (sm.is States.Done)
+  (* waveform stuff *)
+  let uart_value = uart_rx.value -- "uart_value" in
+  let uart_valid = uart_rx.valid -- "uart_valid" in
+  let fifo_empty_value = fifo_empty -- "fifo_empty" in
+
+  let debug_output =
+    concat_msb
+      [
+        uart_value;
+        uart_valid;
+        fifo_empty_value;
+      ];
+  in
+
+  total_splits.value, total_paths.value, (sm.is States.Done), debug_output
 ;;
