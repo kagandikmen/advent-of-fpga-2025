@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 3 (Step 1 & Step 2)
  * Created:     2025-12-19
- * Modified:    2025-12-28
+ * Modified:    2026-01-11
  * Author:      Kagan Dikmen
  *
  *)
@@ -78,7 +78,7 @@ let create_day03_logic ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
 
   let digit = uresize (uart_rx.value -:. Char.to_int '0') 4 in
 
-  let idx = reg_fb spec
+  let _idx = reg_fb spec
     ~enable:vdd
     ~width:7
     ~f:(fun prev ->
@@ -86,7 +86,15 @@ let create_day03_logic ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
     -- "idx"
   in
 
-  let is_last_digit_of_bank = (step_en &: (idx ==:. (n-1))) -- "is_last_digit_of_bank" in
+  let is_last_digit_of_bank = (uart_rx.valid &: ((uart_rx.value ==:. Char.to_int '\n') |: (uart_rx.value ==:. 0x03))) -- "is_last_digit_of_bank" in
+
+  let is_etx_received = reg_fb spec
+    ~enable:vdd
+    ~width:1
+    ~f:(fun prev ->
+      mux2 uart_rx.valid (prev |: (uart_rx.value ==:. 0x03)) prev)
+    -- "is_etx_received"
+  in
 
   let len_w = wire 5 in
   let len_reg = (reg spec len_w) -- "len_reg" in
@@ -150,5 +158,5 @@ let create_day03_logic ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
     -- "total_output_joltage"
   in
 
-  total_output_joltage
+  total_output_joltage, is_etx_received
 ;;
