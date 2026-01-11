@@ -1,8 +1,8 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 1 (Step 1 & Step 2)
- * Created:     2025-12-12
- * Modified:    2025-12-28
+ * AoF - Hardcaml Solution for Day 1 (NEW)
+ * Created:     2026-01-10
+ * Modified:    2026-01-11
  * Author:      Kagan Dikmen
  *
  *)
@@ -14,6 +14,107 @@ open! Hardcaml
 open! Hardcaml_aof
 open! Hardcaml_arty
 open! Signal
+
+module States = struct
+  type t = 
+    | Idle
+    | Receive
+    | Compute
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+
+module Compute_states = struct
+  type t =
+    | Idle
+    | Turn
+  [@@deriving sexp_of, compare, enumerate]
+end
+
+module Fifo_16 = struct
+  let create ~clock ~clear ~depth ~(wr_en: Signal.t) ~(wr_data: Signal.t) ~(rd_en: Signal.t) =
+    let open Always in
+
+    let spec = Reg_spec.create ~clock ~clear () in
+
+    let addr_w = Math.ceil_log2 depth in
+    let cnt_w = addr_w + 1 in
+
+    let wr_ptr = Variable.reg spec ~width:addr_w in
+    let rd_ptr = Variable.reg spec ~width:addr_w in
+    let count = Variable.reg spec ~width:cnt_w in
+
+    let empty = (count.value ==:. 0) in
+    let full = (count.value ==:. depth) in
+
+    let do_wr = wr_en &: ~:full in
+    let do_rd = rd_en &: ~:empty in
+
+    let waddr = Variable.wire ~default:(zero addr_w) in
+    let raddr = Variable.wire ~default:(zero addr_w) in
+    let we = Variable.wire ~default:gnd in
+    let wdata = Variable.wire ~default:(zero 16) in
+
+    let write_port : Signal.write_port =
+      {
+        write_clock = clock;
+        write_enable = we.value;
+        write_address = waddr.value;
+        write_data = wdata.value;
+      }
+    in
+
+    let read_port : Signal.read_port =
+      { 
+        read_clock = clock;
+        read_enable = vdd;
+        read_address = raddr.value;
+      }
+    in
+
+    let ram =
+      Ram.create
+        ~collision_mode:Read_before_write
+        ~size:depth
+        ~write_ports:[| write_port |]
+        ~read_ports:[| read_port |]
+        ()
+    in
+
+    let rd_data = ram.(0) in
+
+    let delta = (mux2 do_wr (one cnt_w) (zero cnt_w)) -: (mux2 do_rd (one cnt_w) (zero cnt_w)) in
+
+    compile
+      [
+        we <--. 0;
+        waddr <-- wr_ptr.value;
+        wdata <-- wr_data;
+        raddr <-- rd_ptr.value;
+
+        when_ do_wr
+          [
+            we <--. 1;
+            waddr <-- wr_ptr.value;
+            wdata <-- wr_data;
+            wr_ptr <-- (wr_ptr.value +:. 1);
+          ];
+
+        when_ do_rd
+          [
+            rd_ptr <-- (rd_ptr.value +:. 1);
+          ];
+
+        count <-- (count.value +: delta);
+      ];
+    
+    rd_data, empty, full
+end
+
+let abs (x: Signal.t) =
+  let is_lt0 = x <+. 0 in
+  mux2 is_lt0 ((zero (width x)) -: x) x
+;;
 
 let divmod100 (d : Signal.t) : Signal.t * Signal.t =
   let step (q, r) =
@@ -29,8 +130,10 @@ let divmod100 (d : Signal.t) : Signal.t * Signal.t =
 ;;
 
 let create_counting_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
-  
-  (* UART receiver state machine *)
+  let open Always in
+
+  let fifo_depth = 8192 in (* subject to change come back to this *)
+
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
     ~clear
@@ -38,88 +141,202 @@ let create_counting_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
     uart_rx_value
   in
 
-  (* for debugging *)
-  let _uart_value = uart_rx.value -- "uart_value" in
-  let _uart_valid = uart_rx.valid -- "uart_valid" in
-
-  let spec = Reg_spec.create 
+  let spec = Reg_spec.create
     ~clock
+    ~clear
     ()
   in
 
-  let is_upcoming_msb = reg_fb spec
-    ~enable:vdd
-    ~width:1
-    ~f:(fun prev ->
-      mux2 uart_rx.valid (~:prev) prev)
-    -- "is_upcoming_msb"
+  let sm = State_machine.create (module States) spec in
+  let csm = State_machine.create (module Compute_states) spec in
+
+  let stopped_at_zero_ctr = Variable.reg spec ~width:32 in
+  let hit_zero_ctr = Variable.reg spec ~width:32 in
+
+  let fifo_wr_en = Variable.wire ~default:gnd in
+  let fifo_wr_data = Variable.wire ~default:(zero 16) in
+  let fifo_rd_en = Variable.wire ~default:gnd in
+
+  let fifo_rd_data, fifo_empty, _fifo_full = Fifo_16.create
+    ~clock
+    ~clear
+    ~depth:fifo_depth
+    ~wr_en:fifo_wr_en.value
+    ~wr_data:fifo_wr_data.value
+    ~rd_en:fifo_rd_en.value
   in
 
-  let lsb_reg = reg spec
-    ~enable:(uart_rx.valid &: (~:is_upcoming_msb))
-    uart_rx.value
-    -- "lsb_reg"
+  let is_etx_received = Variable.reg spec ~width:1 in
+
+  let cur_value_receive = Variable.reg spec ~width:16 in
+  let cur_value_receive_positive = Variable.reg spec ~width:1 in
+
+  let cur_knob_position = Variable.reg spec ~width:20 in
+
+  let done_ctr = Variable.reg spec ~width:8 in
+  let done_th = 100 in
+
+  compile
+    [
+      fifo_wr_en <--. 0;
+      fifo_rd_en <--. 0;
+      fifo_wr_data <--. 0;
+
+      sm.switch
+        [
+          (States.Idle,
+            [
+              when_ uart_rx.valid 
+                [
+                  if_ (uart_rx.value ==:. 0x02)
+                    [
+                      is_etx_received <--. 0;
+
+                      stopped_at_zero_ctr <--. 0;
+                      hit_zero_ctr <--. 0;
+
+                      cur_value_receive <--. 0;
+                      cur_knob_position <--. 50;
+
+                      sm.set_next States.Receive;
+                    ][
+                      sm.set_next States.Idle;
+                    ]
+                ];
+            ]);
+          (States.Receive,
+            [
+              when_ uart_rx.valid
+                [
+                  if_ (uart_rx.value ==:. 0x03)
+                    [
+                      is_etx_received <--. 1;
+
+                      fifo_wr_en <--. 1;
+                      if_ (cur_value_receive_positive.value ==:. 1) [ fifo_wr_data <-- cur_value_receive.value; ][ fifo_wr_data <-- ((zero 16) -: cur_value_receive.value); ];
+                      cur_value_receive <--. 0;
+
+                      sm.set_next States.Compute;
+                    ][
+                      when_ (uart_rx.value ==:. Char.to_int 'R')
+                        [
+                          cur_value_receive_positive <--. 1;
+                        ];
+
+                      when_ (uart_rx.value ==:. Char.to_int 'L')
+                        [
+                          cur_value_receive_positive <--. 0;
+                        ];
+
+                      when_ (uart_rx.value ==:. Char.to_int '\n')
+                        [
+                          fifo_wr_en <--. 1;
+                          if_ (cur_value_receive_positive.value ==:. 1) [ fifo_wr_data <-- cur_value_receive.value; ][ fifo_wr_data <-- ((zero 16) -: cur_value_receive.value); ];
+                          cur_value_receive <--. 0;
+                        ];
+
+                      when_ (Math.is_digit uart_rx.value)
+                        (
+                          let incoming_digit = Math.ascii_to_int8 uart_rx.value in
+                          [
+                            cur_value_receive <-- (Math.mul10 cur_value_receive.value +: uresize incoming_digit 16);
+                          ]
+                        );
+                    ];
+                ];
+            ]);
+          (States.Compute,
+            [
+              when_ (is_etx_received.value &: fifo_empty &: (csm.is Compute_states.Idle))
+                [ sm.set_next States.Done; ]
+            ]);
+          (States.Done,
+            [
+              done_ctr <-- (done_ctr.value +:. 1);
+              when_ (done_ctr.value >=:. done_th)
+                [
+                  done_ctr <--. 0;
+                  sm.set_next States.Idle;
+                ];
+            ]);
+        ];
+
+      csm.switch
+        [
+          (Compute_states.Idle,
+            [
+              when_ (~:fifo_empty)
+                [
+                  fifo_rd_en <--. 1;
+                  csm.set_next Compute_states.Turn;
+                ]
+            ]);
+          (Compute_states.Turn,
+            let turn_mag = abs fifo_rd_data in
+            let is_turn_left = msb fifo_rd_data in
+            let wrap_eff, turn_eff = divmod100 turn_mag in
+
+            let turn_knob pos_old turn_mag is_turn_dir_left =
+              let raw = mux2 is_turn_dir_left (pos_old -: turn_mag) (pos_old +: turn_mag) in
+
+              let is_raw_neg = msb raw in
+              let is_raw_ge100 = raw >=:. 100 in
+
+              let final = mux2 is_raw_neg (raw +:. 100) (mux2 is_raw_ge100 (raw -:. 100) raw) in
+
+              let hundred = Signal.of_int ~width:(width pos_old) 100 in
+              let d_to_zero = mux2 is_turn_dir_left pos_old (hundred -: pos_old) in
+              let hit_zero = mux2 (pos_old ==:. 0) (zero 1) (mux2 (turn_mag >=: d_to_zero) (one 1) (zero 1)) in
+              hit_zero, final
+            in
+
+            let hit_zero_this_time, final = turn_knob cur_knob_position.value (uresize turn_eff 20) is_turn_left in
+            [
+              cur_knob_position <-- final;
+              hit_zero_ctr <-- (hit_zero_ctr.value +: (uresize hit_zero_this_time 32) +: (uresize wrap_eff 32));
+              when_ (final ==:. 0) [stopped_at_zero_ctr <-- (stopped_at_zero_ctr.value +:. 1); ];
+
+              csm.set_next Compute_states.Idle;
+            ]);
+        ];
+    ];
+
+  let uart_value = uart_rx.value -- "uart_value" in
+  let uart_valid = uart_rx.valid -- "uart_valid" in
+  let is_sm_idle = (sm.is States.Idle) -- "is_sm_idle" in
+  let is_sm_receive = (sm.is States.Receive) -- "is_sm_receive" in
+  let is_sm_compute = (sm.is States.Compute) -- "is_sm_compute" in
+  let is_sm_done = (sm.is States.Done) -- "is_sm_done" in
+  let is_csm_idle = (csm.is Compute_states.Idle) -- "is_csm_idle" in
+  let is_csm_turn = (csm.is Compute_states.Turn) -- "is_csm_turn" in
+  let fifo_wr_en_value = fifo_wr_en.value -- "fifo_wr_en" in
+  let fifo_rd_en_value = fifo_rd_en.value -- "fifo_rd_en" in
+  let fifo_wr_data_value = fifo_wr_data.value -- "fifo_wr_data" in
+  let is_etx_received_value = is_etx_received.value -- "is_etx_received" in
+  let cur_value_receive_value = cur_value_receive.value -- "cur_value_receive" in
+  let cur_value_receive_positive_value = cur_value_receive_positive.value -- "cur_value_receive_positive" in
+  let cur_knob_position_value = cur_knob_position.value -- "cur_knob_position" in
+
+  let debug_output =
+    concat_msb
+      [
+        uart_value;
+        uart_valid;
+        is_sm_idle;
+        is_sm_receive;
+        is_sm_compute;
+        is_sm_done;
+        is_csm_idle;
+        is_csm_turn;
+        fifo_wr_en_value;
+        fifo_rd_en_value;
+        fifo_wr_data_value;
+        is_etx_received_value;
+        cur_value_receive_value;
+        cur_value_receive_positive_value;
+        cur_knob_position_value;
+      ];
   in
 
-  let msb_arrived = (uart_rx.valid &: is_upcoming_msb) -- "msb_arrived" in
-
-  let value_16 = concat_msb [ uart_rx.value; lsb_reg; ] -- "value_16" in  (* this is a "sliding window" *)
-  let value_32 = sresize value_16 32 -- "value_32" in
-
-  let is_dir_left = msb value_32 -- "is_dir_left" in
-  let turn_mag_32 = mux2 is_dir_left (negate value_32) value_32 -- "turn_mag_32" in
-
-  let next_pos_wire = wire 32 in
-  
-  let pos_reg = reg_fb spec
-    ~enable:vdd
-    ~width:32 
-    ~f:(fun _prev ->
-      let init_value = of_int ~width:32 50 in
-      mux2 clear init_value next_pos_wire)
-    -- "pos_reg" 
-  in
-
-  let wrap_eff, turn_eff = divmod100 turn_mag_32 in
-  
-  let turn_knob pos_old turn_value is_turn_dir_left =
-    let raw = mux2 is_turn_dir_left (pos_old -: turn_value) (pos_old +: turn_value) in
-
-    let is_raw_neg = msb raw in
-    let is_raw_ge100 = raw >=:. 100 in
-
-    let final = mux2 is_raw_neg (raw +:. 100) (mux2 is_raw_ge100 (raw -:. 100) raw) in
-
-    let hundred = of_int ~width:(width pos_old) 100 in
-    let d_to_zero = mux2 is_turn_dir_left pos_old (hundred -: pos_old) in
-    let hit_zero = mux2 (pos_old ==:. 0) (zero 1) (mux2 (turn_value >=: d_to_zero) (one 1) (zero 1)) in
-    hit_zero, final
-  in
-
-  let hit_zero_final, next_value = turn_knob pos_reg turn_eff is_dir_left in
-
-  let next_pos_reg = (mux2 msb_arrived next_value pos_reg) -- "next_pos_reg" in
-  assign next_pos_wire next_pos_reg; 
-
-  let is_next_pos_zero = (next_pos_wire ==:. 0) -- "is_next_pos_zero" in
-
-  let stopped_at_zero_ctr = reg_fb spec
-    ~enable:vdd
-    ~width:32
-    ~f:(fun prev -> 
-      mux2 clear (zero 32) (mux2 msb_arrived (prev +: uresize is_next_pos_zero 32) prev))
-    -- "stopped_at_zero_ctr"
-  in
-
-  let hit_zero_ctr = reg_fb spec
-    ~enable:vdd
-    ~width:32
-    ~f:(fun prev ->
-      let init_value = zero 32 in
-      mux2 clear init_value (mux2 msb_arrived (prev +: (uresize wrap_eff 32 +: uresize hit_zero_final 32)) prev)
-      )
-    -- "hit_zero_ctr"
-  in
-
-  stopped_at_zero_ctr, hit_zero_ctr
+  stopped_at_zero_ctr.value, hit_zero_ctr.value, (sm.is States.Done), debug_output
 ;;
