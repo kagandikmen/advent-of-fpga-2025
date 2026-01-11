@@ -107,16 +107,41 @@ The puzzle of day 1 consists of two steps. For a given turning sequence, it need
 - how many times the lock mechanism of a door stops at zero (Step 1)
 - how many times the lock mechanism of a door hits zero (Step 2)
 
+The key detail is that it is a circular lock that is being turned. So the counter wraps at 100. (0 and 99 are neighbors.)
+
 ### My Solution
 
-[My solution](src/day01/day01.ml) takes a structured performance-first approach while avoiding the use of area- and power-hungry multiplication or division logic. The rotation values are first converted to 16-bit integers by the host, the sign of the integer depending on the direction of the rotation. These integers are then sent to the FPGA sequentially over UART. After each integer arrives, the FPGA computes:
+The state machines in [my solution](src/day01/day01.ml) are fairly simple. You can find them below. `States` signifies the "main states," which relate to general control of the execution. `Compute_states` signifies the execution steps of the "knob turner" logic that starts running in the background as input text starts flowing to the FPGA through the UART bus.
 
-- whether the lock stops at zero (for step 1)
-- whether the lock hits zero (for step 2)
+```ocaml
+module States = struct
+  type t = 
+    | Idle
+    | Receive
+    | Compute
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
 
-These computations are performed while the next integer is still being transmitted over UART. This allows for an efficient "pipelined" execution that overlaps communication and computation.
+module Compute_states = struct
+  type t =
+    | Idle
+    | Turn
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
 
-For each rotation, the logic computes the quotient and remainder of a division by 100 using iterative subtraction, taking advantage of the rotation values never exceeding 1000 in this case. The iteration count (defaulted to nine) can easily be increased or decreased for different rotation sequences. How the performance vs. area tradeoff would be affected by the usage of division operation may be inquired in the future.
+The FPGA starts at `Idle`. In this state it is doing nothing, except for the fact that it is listening to the UART bus for the special ASCII control character "start of text." Once it is received, the FPGA transfers to the state `Receive` where it starts receiving unprocessed raw input text through the UART bus. The logic parses every line, registering the R or L at the start as positive or negative turn, and at each line break it saves the received turn value into its 16-bit wide FIFO. When the ASCII control character for "end of text" is received, the logic moves onto the state `Compute` where it waits for the knob turner logic to complete. When it is complete, it concludes everything by moving onto the state `Done`. 
+
+The knob turner logic is another state machine (a very simple one) that "runs in the background" while the FPGA is actually still listening to the UART bus for new knob turn data. Knob turner logic is triggered when the FIFO is no longer empty. This causes the knob turner state machine to move to its only active state `Turn`. In this state the turn magnitude and direction is analyzed and the values for part 1 and part 2 of the puzzle are updated accordingly. Because this logic is fast enough to conclude before the next turn is saved into the FIFO, the FIFO depth requirement is extremely low for this application.
+
+In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateless design which required the values to be converted into 16-bit integers on the host side. As I am on a newfound quest toward zero host-side processing, I felt a necessity to move away from this old design. To my surprise, the new design is 28% faster!
+
+### Suggestions
+
+The knob turner logic is both much faster than the UART transmission and runs parallel to it. Therefore the UART transmission is the overwhelmingly biggest performance bottleneck. As one of my main design concerns is real-world FPGA deployability, I will not move away from the UART transmission. However, if you don't feel bounded by this, feel free to attack the data transmission first. You may need to increase the FIFO depth as you move towards faster transmission protocols. 
+
+To avoid costly division logic, I used a 10-step subtraction routine instead of dividing the rotation magnitude by 100. The same routine (function `divmod100`) also serves as modulo. It uses a trick, however: It makes use of the fact that our turns in the puzzle input never exceed 1000. In case you have bigger turn magnitudes, you need to increase the number of steps by modifying it.
 
 <br><br><br></details>
 
