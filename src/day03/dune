@@ -1,4 +1,12 @@
 (library
  (name day03)
+ (modules day03)
  (libraries core hardcaml hardcaml_aof hardcaml_arty)
+ (preprocess (pps ppx_deriving_hardcaml ppx_jane)))
+
+
+(executable
+ (name day03_arty)
+ (modules day03_arty)
+ (libraries base day03 hardcaml hardcaml_aof hardcaml_arty)
  (preprocess (pps ppx_deriving_hardcaml ppx_jane)))

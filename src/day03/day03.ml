@@ -2,12 +2,10 @@
  *
  * AoF - Hardcaml Solution for Day 3
  * Created:     2025-12-19
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -51,16 +49,9 @@ let digits_to_number (digits: Signal.t list) : Signal.t =
   List.fold digits ~init:(zero 64) ~f:(fun acc d -> Math.mul10 acc +: u64 d)
 ;;
 
-let create ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
+let create_logic ~clock ~clear ~k (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let n = 100 in
   let drops_max = n - k in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let _uart_value = uart_rx.value -- "uart_value" in
   let _uart_valid = uart_rx.valid -- "uart_valid" in
@@ -156,4 +147,14 @@ let create ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
   in
 
   total_output_joltage, is_etx_received
+;;
+
+let create ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear ~k uart_rx
 ;;
