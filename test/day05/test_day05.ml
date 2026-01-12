@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 5
  * Created:     2025-12-24
- * Modified:    2025-12-28
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -70,7 +70,7 @@ let%expect_test "day05_test" =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let num_fresh, num_covered_ids, is_done = Day05.create_day05_logic
+  let num_fresh, num_covered_ids, is_done = Day05.create
     ~clock
     ~clear
     ~cycles_per_bit

@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 3 
  * Created:     2025-12-21
- * Modified:    2026-01-11
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -28,7 +28,7 @@ let day03_test ~k =
   let uart_rx_value = input "uart_rx_value" 1 in
 
   (* toj: total output joltage *)
-  let toj, is_done = Day03.create_day03_logic
+  let toj, is_done = Day03.create
     ~clock
     ~clear
     ~cycles_per_bit

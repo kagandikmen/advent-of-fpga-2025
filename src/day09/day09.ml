@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 9 (Step 1 & Step 2)
  * Created:     2026-01-02
- * Modified:    2026-01-02
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -32,7 +32,7 @@ let abs a b = mux2 (a >=: b) (a -: b) (b -: a)
 let read_array = Procedure.read_array
 let write_array = Procedure.write_array
 
-let create_day09_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_redtiles = 512 in

@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 4 (NEW)
  * Created:     2025-12-22
- * Modified:    2026-01-11
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -36,7 +36,7 @@ module Cell = struct
     }
 end
 
-let create_day04_logic ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
   let dim = 138 in
   let dim' = dim + 2 in
   let mem_depth = dim' * dim' in

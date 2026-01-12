@@ -32,7 +32,7 @@ module Compute_states = struct
   [@@deriving sexp_of, compare, enumerate]
 end
 
-let create_day07_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let fifo_depth = 2 in

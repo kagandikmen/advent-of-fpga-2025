@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 3 (Step 1 & Step 2)
  * Created:     2025-12-19
- * Modified:    2026-01-11
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -51,10 +51,7 @@ let digits_to_number (digits: Signal.t list) : Signal.t =
   List.fold digits ~init:(zero 64) ~f:(fun acc d -> Math.mul10 acc +: u64 d)
 ;;
 
-
-(* main logic *)
-
-let create_day03_logic ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~k uart_rx_value =
   let n = 100 in
   let drops_max = n - k in
 

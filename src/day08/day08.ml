@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 8 (Step 1 & Step 2)
  * Created:     2025-12-31
- * Modified:    2026-01-02
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -50,8 +50,7 @@ let sq_u48 d =
   let d48 = uresize d 48 in
   d48 *^: d48
 
-
-let create_day08_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let p1_mark = 50 in

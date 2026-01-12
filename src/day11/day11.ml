@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 11 (Step 1 & Step 2)
  * Created:     2026-01-03
- * Modified:    2026-01-06
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -47,7 +47,7 @@ let ( *^: ) a b = uresize (a *: b) (width a)
 let read_array = Procedure.read_array
 let write_array = Procedure.write_array
 
-let create_day11_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_nodes = 512 in

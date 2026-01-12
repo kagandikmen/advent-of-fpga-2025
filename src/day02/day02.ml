@@ -54,7 +54,7 @@ end
 let u64 x = uresize x 64
 let ceil_log2 = Math.ceil_log2
 
-let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let fifo_depth = 64 in

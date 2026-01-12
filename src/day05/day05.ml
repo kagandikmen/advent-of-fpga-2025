@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 5 (Step 1 & Step 2)
  * Created:     2025-12-24
- * Modified:    2025-12-26
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -41,10 +41,7 @@ module States = struct
   [@@deriving sexp_of, compare, enumerate]
 end
 
-
-(* main logic*)
-
-let create_day05_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_range_count = 200 in

@@ -49,7 +49,7 @@ let divmod100 (d : Signal.t) : Signal.t * Signal.t =
     ~f:(fun acc _ -> step acc)
 ;;
 
-let create_counting_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let fifo_depth = 4 in (* subject to change come back to this *)

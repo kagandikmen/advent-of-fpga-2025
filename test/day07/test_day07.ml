@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 7
  * Created:     2025-12-28
- * Modified:    2026-01-11
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -27,7 +27,7 @@ let%expect_test "day07_test" =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let total_splits, total_paths, is_done, debug_output = Day07.create_day07_logic
+  let total_splits, total_paths, is_done, debug_output = Day07.create
     ~clock
     ~clear
     ~cycles_per_bit

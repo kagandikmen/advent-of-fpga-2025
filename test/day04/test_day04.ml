@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 4
  * Created:     2025-12-22
- * Modified:    2026-01-11
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -27,7 +27,7 @@ let day04_test ~max_passes =
   let clear = input "clear" 1 in
   let uart_rx_value = input "uart_rx_value" 1 in
 
-  let total_rolls_collected, is_done, debug_output = Day04.create_day04_logic
+  let total_rolls_collected, is_done, debug_output = Day04.create
     ~clock
     ~clear
     ~cycles_per_bit

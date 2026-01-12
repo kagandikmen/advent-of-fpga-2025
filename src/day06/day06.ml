@@ -2,7 +2,7 @@
  *
  * AoF - (New) Hardcaml Solution for Day 6 (Step 1 & Step 2)
  * Created:     2025-12-26
- * Modified:    2025-12-28
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -43,8 +43,7 @@ end
 
 let ( *^: ) (a: Signal.t) (b: Signal.t) : Signal.t = uresize (a *: b) 64
 
-
-let create_day06_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
   let max_rows = 8 in
