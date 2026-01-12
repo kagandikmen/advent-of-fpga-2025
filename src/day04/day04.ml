@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 4
  * Created:     2025-12-22
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
@@ -10,8 +10,6 @@
 (*************************** IMPORTANT ****************************)
 (* For an older solution, see src/old/day04/                      *)
 (******************************************************************)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -40,7 +38,7 @@ module Cell = struct
     }
 end
 
-let create ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
+let create_logic ~clock ~clear ~max_passes (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let dim = 138 in
   let dim' = dim + 2 in
   let mem_depth = dim' * dim' in
@@ -64,13 +62,6 @@ let create ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
       + dim';
       + dim' + 1;
     ]
-  in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
   in
 
   let is_at = (uart_rx.valid &: (uart_rx.value ==:. Char.to_int '@')) -- "is_at" in
@@ -268,4 +259,14 @@ let create ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
   in
 
   total_removed, p_done, debug_output
+;;
+
+let create ~clock ~clear ~cycles_per_bit ~max_passes uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear ~max_passes uart_rx
 ;;
