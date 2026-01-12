@@ -11,8 +11,6 @@
 (* For an older solution, see src/old/day01/                      *)
 (******************************************************************)
 
-(* TODO: Add FPGA build and RTL generation logic *)
-
 open! Core
 open! Hardcaml
 open! Hardcaml_aof
@@ -53,17 +51,10 @@ let divmod100 (d : Signal.t) : Signal.t * Signal.t =
     ~f:(fun acc _ -> step acc)
 ;;
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let fifo_depth = 4 in (* subject to change come back to this *)
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let spec = Reg_spec.create
     ~clock
@@ -264,4 +255,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   in
 
   stopped_at_zero_ctr.value, hit_zero_ctr.value, (sm.is States.Done), debug_output
+;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
 ;;
