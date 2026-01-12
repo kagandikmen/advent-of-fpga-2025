@@ -1,6 +1,6 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 2 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 2
  * Created:     2026-01-07
  * Modified:    2026-01-12
  * Author:      Kagan Dikmen
@@ -8,8 +8,7 @@
  *)
 
 (*************************** IMPORTANT ****************************)
-(* This is the newer & much-faster implementation.                *)
-(* For an older solution, see day02_old.ml                        *)
+(* For an older solution, see src/old/day02/                      *)
 (******************************************************************)
 
 (* TODO: Add FPGA build and RTL generation logic *)

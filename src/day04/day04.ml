@@ -1,11 +1,15 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 4 (NEW)
+ * AoF - Hardcaml Solution for Day 4
  * Created:     2025-12-22
  * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
+
+(*************************** IMPORTANT ****************************)
+(* For an older solution, see src/old/day04/                      *)
+(******************************************************************)
 
 (* TODO: Add FPGA build and RTL generation logic *)
 

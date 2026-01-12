@@ -1,6 +1,6 @@
 (*
  *
- * AoF - (New) Hardcaml Solution for Day 6 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 6
  * Created:     2025-12-26
  * Modified:    2026-01-12
  * Author:      Kagan Dikmen
@@ -8,8 +8,7 @@
  *)
 
 (*************************** IMPORTANT ****************************)
-(* This is the newer & much-faster RAM-based implementation.      *)
-(* For an older array-based solution, see day06_old.ml            *)
+(* For an older solution, see src/old/day06/                      *)
 (******************************************************************)
 
 (* TODO: Add FPGA build and RTL generation logic *)

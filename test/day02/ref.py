@@ -1,6 +1,6 @@
-# AoF - Reference Solution for Day 2 (Step 1 & Step 2)
+# AoF - Reference Solution for Day 2
 # Created:      2025-12-14
-# Modified:     2025-12-15
+# Modified:     2026-01-12
 # Author:       Kagan Dikmen
 
 import sys

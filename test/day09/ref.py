@@ -1,6 +1,6 @@
-# AOF - Reference Solution for Day 9 (Part 1 & Part 2)
+# AoF - Reference Solution for Day 9
 # Created:      2026-01-02
-# Modified:     2026-01-02
+# Modified:     2026-01-12
 # Author:       Kagan Dikmen
 
 import sys

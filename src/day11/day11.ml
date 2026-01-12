@@ -1,6 +1,6 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 11 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 11
  * Created:     2026-01-03
  * Modified:    2026-01-12
  * Author:      Kagan Dikmen

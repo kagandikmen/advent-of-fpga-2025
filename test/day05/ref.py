@@ -1,6 +1,6 @@
-# AOF - Reference Solution for Day 5 (Part 1 & Part 2)
+# AoF - Reference Solution for Day 5
 # Created:      2025-12-23
-# Modified:     2025-12-23
+# Modified:     2026-01-12
 # Author:       Kagan Dikmen
 
 import sys

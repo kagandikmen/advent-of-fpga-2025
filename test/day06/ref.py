@@ -1,6 +1,6 @@
-# AOF - Reference Solution for Day 6 (Part 1 & Part 2)
+# AoF - Reference Solution for Day 6
 # Created:      2025-12-26
-# Modified:     2025-12-26
+# Modified:     2026-01-12
 # Author:       Kagan Dikmen
 
 import math

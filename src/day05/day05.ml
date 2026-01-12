@@ -1,6 +1,6 @@
 (*
  *
- * AoF - Hardcaml Solution for Day 5 (Step 1 & Step 2)
+ * AoF - Hardcaml Solution for Day 5
  * Created:     2025-12-24
  * Modified:    2026-01-12
  * Author:      Kagan Dikmen
