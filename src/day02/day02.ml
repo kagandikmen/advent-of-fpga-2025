@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 2 (Step 1 & Step 2)
  * Created:     2026-01-07
- * Modified:    2026-01-10
+ * Modified:    2026-01-12
  * Author:      Kagan Dikmen
  *
  *)
@@ -54,87 +54,6 @@ end
 let u64 x = uresize x 64
 let ceil_log2 = Math.ceil_log2
 
-module Fifo_40 = struct
-
-  let create ~clock ~clear ~depth ~(wr_en: Signal.t) ~(wr_data: Signal.t) ~(rd_en: Signal.t) =
-    let open Always in
-
-    let spec = Reg_spec.create ~clock ~clear () in
-
-    let addr_w = ceil_log2 depth in
-    let cnt_w = addr_w + 1 in
-
-    let wr_ptr = Variable.reg spec ~width:addr_w in
-    let rd_ptr = Variable.reg spec ~width:addr_w in
-    let count = Variable.reg spec ~width:cnt_w in
-
-    let empty = (count.value ==:. 0) in
-    let full = (count.value ==:. depth) in
-
-    let do_wr = wr_en &: ~:full in
-    let do_rd = rd_en &: ~:empty in
-
-    let waddr = Variable.wire ~default:(zero addr_w) in
-    let raddr = Variable.wire ~default:(zero addr_w) in
-    let we = Variable.wire ~default:gnd in
-    let wdata = Variable.wire ~default:(zero 40) in
-
-    let write_port : Signal.write_port =
-      {
-        write_clock = clock;
-        write_enable = we.value;
-        write_address = waddr.value;
-        write_data = wdata.value;
-      }
-    in
-
-    let read_port : Signal.read_port =
-      { 
-        read_clock = clock;
-        read_enable = vdd;
-        read_address = raddr.value;
-      }
-    in
-
-    let ram =
-      Ram.create
-        ~collision_mode:Read_before_write
-        ~size:depth
-        ~write_ports:[| write_port |]
-        ~read_ports:[| read_port |]
-        ()
-    in
-
-    let rd_data = ram.(0) in
-
-    let delta = (mux2 do_wr (one cnt_w) (zero cnt_w)) -: (mux2 do_rd (one cnt_w) (zero cnt_w)) in
-
-    compile
-      [
-        we <--. 0;
-        waddr <-- wr_ptr.value;
-        wdata <-- wr_data;
-        raddr <-- rd_ptr.value;
-
-        when_ do_wr
-          [
-            we <--. 1;
-            waddr <-- wr_ptr.value;
-            wdata <-- wr_data;
-            wr_ptr <-- (wr_ptr.value +:. 1);
-          ];
-
-        when_ do_rd
-          [
-            rd_ptr <-- (rd_ptr.value +:. 1);
-          ];
-
-        count <-- (count.value +: delta);
-      ];
-    
-    rd_data, empty, full
-end
-
 let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let open Always in
 
@@ -167,19 +86,21 @@ let create_addition_logic ~clock ~clear ~cycles_per_bit uart_rx_value =
   let fifo_hi_wr_data = Variable.wire ~default:(zero 40) in
   let fifo_hi_rd_en = Variable.wire ~default:gnd in
 
-  let fifo_lo_rd_data, fifo_lo_empty, fifo_lo_full = Fifo_40.create
+  let fifo_lo_rd_data, fifo_lo_empty, fifo_lo_full = Fifo.create
     ~clock
     ~clear
     ~depth:fifo_depth
+    ~width:40
     ~wr_en:fifo_lo_wr_en.value
     ~wr_data:fifo_lo_wr_data.value
     ~rd_en:fifo_lo_rd_en.value
   in
 
-  let fifo_hi_rd_data, fifo_hi_empty, fifo_hi_full = Fifo_40.create
+  let fifo_hi_rd_data, fifo_hi_empty, fifo_hi_full = Fifo.create
     ~clock
     ~clear
     ~depth:fifo_depth
+    ~width:40
     ~wr_en:fifo_hi_wr_en.value
     ~wr_data:fifo_hi_wr_data.value
     ~rd_en:fifo_hi_rd_en.value
