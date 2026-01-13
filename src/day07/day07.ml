@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 7
  * Created:     2025-12-28
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
@@ -10,8 +10,6 @@
 (*************************** IMPORTANT ****************************)
 (* For an older solution, see src/old/day07/                      *)
 (******************************************************************)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -36,17 +34,10 @@ module Compute_states = struct
   [@@deriving sexp_of, compare, enumerate]
 end
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let fifo_depth = 2 in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let spec = Reg_spec.create
     ~clock
@@ -256,4 +247,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   in
 
   total_splits.value, total_paths.value, (sm.is States.Done), debug_output
+;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
 ;;
