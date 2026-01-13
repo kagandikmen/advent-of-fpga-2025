@@ -2,18 +2,19 @@
  *
  * AoF - Hardcaml Solution for Day 11
  * Created:     2026-01-03
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
 
-(* TODO: Add FPGA build and RTL generation logic *)
-
 (*
+ * ABBREVIATIONS
+ * 
  * n: node
  * e: edge
  * nn: node name
  * nid: node id
+ *
  *)
 
 open! Core
@@ -47,7 +48,7 @@ let ( *^: ) a b = uresize (a *: b) (width a)
 let read_array = Procedure.read_array
 let write_array = Procedure.write_array
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let max_nodes = 512 in
@@ -55,13 +56,6 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
 
   let node_addr_w = Math.ceil_log2 max_nodes in
   let edge_addr_w = Math.ceil_log2 max_edges in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let spec = Reg_spec.create
     ~clock
@@ -540,4 +534,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   in
 
   p1_result.value, p2_result.value, (sm.is States.Done), debug_output
+;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
 ;;
