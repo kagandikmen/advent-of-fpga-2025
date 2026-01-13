@@ -2,12 +2,10 @@
  *
  * AoF - Hardcaml Solution for Day 8
  * Created:     2025-12-31
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -50,7 +48,7 @@ let sq_u48 d =
   let d48 = uresize d 48 in
   d48 *^: d48
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let p1_mark = 50 in
@@ -63,13 +61,6 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   let vertex_addr_w = Math.ceil_log2 max_vertices in 
   let edge_addr_w = Math.ceil_log2 max_edges_ceil_pow2 in
   let edge_len_w = edge_addr_w + 1 in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let spec = Reg_spec.create
     ~clock
@@ -615,4 +606,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
   in
 
   total_p1.value, total_p2.value, (sm.is States.Done), debug_output
+;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
 ;;
