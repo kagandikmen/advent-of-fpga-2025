@@ -1,0 +1,8 @@
+# Vivado stuff
+.Xil/
+clockInfo.txt
+*.log
+
+# RTL generation
+outputs/
+hardcaml_arty_top.v
