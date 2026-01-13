@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 6
  * Created:     2025-12-26
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
@@ -10,8 +10,6 @@
 (*************************** IMPORTANT ****************************)
 (* For an older solution, see src/old/day06/                      *)
 (******************************************************************)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -42,19 +40,12 @@ end
 
 let ( *^: ) (a: Signal.t) (b: Signal.t) : Signal.t = uresize (a *: b) 64
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let max_rows = 8 in
   let max_cols = 4096 in
   let grid_size = max_rows * max_cols in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   let _uart_value = uart_rx.value -- "uart_value" in
   let _uart_valid = uart_rx.valid -- "uart_valid" in
@@ -423,3 +414,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
 
   total_p1.value, total_p2.value, (sm.is States.Done)
 ;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
+;;
+
