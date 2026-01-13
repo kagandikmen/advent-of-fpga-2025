@@ -2,12 +2,10 @@
  *
  * AoF - Hardcaml Solution for Day 5
  * Created:     2025-12-24
- * Modified:    2026-01-12
+ * Modified:    2026-01-13
  * Author:      Kagan Dikmen
  *
  *)
-
-(* TODO: Add FPGA build and RTL generation logic *)
 
 open! Core
 open! Hardcaml
@@ -41,19 +39,12 @@ module States = struct
   [@@deriving sexp_of, compare, enumerate]
 end
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let max_range_count = 200 in
   let max_mrange_count = 200 in
   let max_id_count = 1024 in
-
-  let uart_rx = Uart.Expert.create_rx_state_machine
-    ~clock
-    ~clear
-    ~cycles_per_bit
-    uart_rx_value
-  in
 
   (* for debugging *)
   let _uart_valid = uart_rx.valid -- "uart_valid" in
@@ -372,4 +363,14 @@ let create ~clock ~clear ~cycles_per_bit uart_rx_value =
     ];
   
   num_fresh.value, num_covered.value, (sm.is States.Done)
+;;
+
+let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+  let uart_rx = Uart.Expert.create_rx_state_machine
+    ~clock
+    ~clear
+    ~cycles_per_bit
+    uart_rx_value
+  in
+  create_logic ~clock ~clear uart_rx
 ;;
