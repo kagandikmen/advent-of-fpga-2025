@@ -1,6 +1,0 @@
- (executables
-  (names blinker)
-  (libraries
-     base
-     hardcaml
-     hardcaml_arty))
