@@ -1,29 +1,33 @@
 # AoF - Reference Solution for Day 4
 # Created:      2025-12-21
-# Modified:     2026-01-12
+# Modified:     2026-01-15
 # Author:       Kagan Dikmen
 
 import sys
 
-dim = 138
-
 def main():
-    grid = [[0] * (dim+2) for _ in range(dim+2)]
+
+    with open(sys.argv[1], "r") as f:
+        lines = [line.strip() for line in f]
+
+    row_dim = len(lines)
+    col_dim = len(lines[0])
+
+    grid = [[0] * (col_dim+2) for _ in range(row_dim+2)]
 
     accessible_list = []
     num_accessible = 1
     num_removed = 0
 
-    with open(sys.argv[1], "r") as f:
-        for li, line in enumerate(f):
-            for ci, char in enumerate(line.strip()):
-                grid[li+1][ci+1] = char == '@'
+    for li, line in enumerate(lines):
+        for ci, char in enumerate(line):
+            grid[li+1][ci+1] = char == '@'
 
     iter_cnt = 0
     while(num_accessible != 0):
         
-        for li in range(1, dim+1):
-            for ci in range(1, dim+1):
+        for li in range(1, row_dim+1):
+            for ci in range(1, col_dim+1):
 
                 adjacent_paper_rolls = -grid[li][ci]
                 for li_n in range(li-1, li+2):

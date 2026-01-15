@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 4
  * Created:     2025-12-22
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -18,7 +18,6 @@ open! Hardcaml_arty
 open! Signal
 
 let u4 x = uresize x 4
-let mul140 x = (sll x 7) +: (sll x 3) +: (sll x 2)
 let add_offset addr off = if off >= 0 then addr +:. off else addr -:. (-off)
 
 module Cell = struct
@@ -39,34 +38,38 @@ module Cell = struct
 end
 
 let create_logic ~clock ~clear ~max_passes (uart_rx: Signal.t Uart.Byte_with_valid.t) =
-  let dim = 138 in
-  let dim' = dim + 2 in
-  let mem_depth = dim' * dim' in
-  let addr_width = 15 in
+
+  let max_row_dim = (1 lsl 8) in
+  let max_col_dim = (1 lsl 8) in
+  let mem_depth = max_row_dim * max_col_dim in
+  let addr_width = (Math.ceil_log2 mem_depth) in
 
   let row_col_to_addr r c =
     let r' = uresize r addr_width in
     let c' = uresize c addr_width in
-    let r140 = mul140 r' in
-    r140 +: c'
+    let r'' = (Signal.sll r' 8) in
+    r'' +: c'
   in
 
   let nb_offsets =
-    [
-      - dim' - 1; 
-      - dim';
-      - dim' + 1;
-      - 1;
-      + 1;
-      + dim' - 1;
-      + dim';
-      + dim' + 1;
-    ]
+  [
+    - max_col_dim - 1; 
+    - max_col_dim;
+    - max_col_dim + 1;
+    - 1;
+    + 1;
+    + max_col_dim - 1;
+    + max_col_dim;
+    + max_col_dim + 1;
+  ]
   in
 
   let is_at = (uart_rx.valid &: (uart_rx.value ==:. Char.to_int '@')) -- "is_at" in
   let is_dot = (uart_rx.valid &: (uart_rx.value ==:. Char.to_int '.')) -- "is_dot" in
   let is_cell = (is_at |: is_dot) -- "is_cell" in
+  let is_stx = (uart_rx.valid &: (uart_rx.value ==:. 0x02)) -- "is_stx" in
+  let is_etx = (uart_rx.valid &: (uart_rx.value ==:. 0x03)) -- "is_etx" in
+  let is_nl = (uart_rx.valid &: (uart_rx.value ==:. Char.to_int '\n')) -- "is_nl" in
 
   let spec = Reg_spec.create
     ~clock
@@ -74,32 +77,54 @@ let create_logic ~clock ~clear ~max_passes (uart_rx: Signal.t Uart.Byte_with_val
     ()
   in
 
+  let row_load = reg_fb (Reg_spec.override spec ~clear_to:(one 8))
+    ~enable:vdd
+    ~width:8
+    ~f:(fun prev ->
+      mux2 (is_nl |: is_etx) (prev +:. 1) prev)
+    -- "row_load"
+  in
+
+  let col_load = reg_fb (Reg_spec.override spec ~clear_to:(one 8))
+    ~enable:vdd
+    ~width:8
+    ~f:(fun prev ->
+      mux2 is_nl (one 8) (mux2 is_cell (prev +:. 1) prev))
+    -- "col_load"
+  in
+
   (* states of the FSM *)
-  let phase_w = wire 2 in 
+  let phase_w = wire 3 in 
   let phase = reg spec phase_w -- "phase" in
-  let p_load = phase ==:. 0 in
-  let p_switch = phase ==:. 1 in  (* takes one cycle *)
-  let p_remove = phase ==:. 2 in
-  let p_done = phase ==:. 3 in
+  let p_idle = phase ==:. 0 in
+  let p_load = phase ==:. 1 in
+  let p_switch = phase ==:. 2 in  (* takes one cycle *)
+  let p_remove = phase ==:. 3 in
+  let p_done = phase ==:. 4 in
+
+  let done_th = Signal.of_int ~width:8 100 in
+  let done_ctr = reg_fb spec
+    ~enable:vdd ~width:8 ~f:(fun prev -> mux2 p_done (prev +:. 1) prev)
+  in
 
   (* we have dim+2 rows & cols in hw. the first and last ones are for the edges. so we reset to one. *)
-  let row_w = wire 8 in
-  let row = reg (Reg_spec.override spec ~clear_to:(one 8)) row_w -- "row" in 
+  let row_remove_w = wire 8 in
+  let row_remove = reg (Reg_spec.override spec ~clear_to:(one 8)) row_remove_w -- "row_remove" in 
 
-  let col_w = wire 8 in
-  let col = reg (Reg_spec.override spec ~clear_to:(one 8)) col_w -- "col" in
+  let col_remove_w = wire 8 in
+  let col_remove = reg (Reg_spec.override spec ~clear_to:(one 8)) col_remove_w -- "col_remove" in
 
-  let addr = (row_col_to_addr row col) -- "addr" in
+  let addr = mux2 p_load (row_col_to_addr row_load col_load) (mux2 p_remove (row_col_to_addr row_remove col_remove) (zero addr_width)) -- "addr" in
   
-  let last_row = row ==:. dim in
-  let last_col = col ==:. dim in
+  let last_row = (row_remove +:. 1 ==: row_load) -- "last_row" in
+  let last_col = (col_remove +:. 1 ==: col_load) -- "last_col" in
   let last_cell = (last_row &: last_col) -- "last_cell" in
 
-  let step_en = ((p_load &: is_cell) |: p_remove) -- "step_en" in 
-
-  let p_load_done = (p_load &: is_cell &: last_cell) -- "p_load_done" in
+  let p_idle_done = (p_idle &: is_stx) -- "p_idle_done" in
+  let p_load_done = (p_load &: is_etx) -- "p_load_done" in
   let p_switch_done = p_switch in
   let p_remove_done = (p_remove &: last_cell) -- "p_remove_done" in
+  let p_done_done = (p_done &: (done_ctr >=: done_th)) -- "p_done_done" in
 
   (* important: remove_ctr shows how many remove passes are COMPLETED *)
   let remove_ctr = reg_fb spec
@@ -115,18 +140,22 @@ let create_logic ~clock ~clear ~max_passes (uart_rx: Signal.t Uart.Byte_with_val
   let pass_removed_ctr = reg spec pass_removed_ctr_w -- "pass_removed_ctr" in
   let pass_removed_zero = (pass_removed_ctr ==:. 0) -- "pass_removed_zero" in
 
+  let is_next_load = p_idle_done in
   let is_next_remove = p_switch_done in
   let is_next_done = p_remove_done &: (((max_passes ==:. 0) &: pass_removed_zero) |: ((max_passes >:. 0) &: (max_passes ==: (remove_ctr +: one 8)))) in
   let is_next_switch_from_load = p_load_done in
   let is_next_switch_from_remove = p_remove_done &: (~:is_next_done) in
   let is_next_switch = is_next_switch_from_load |: is_next_switch_from_remove in
+  let is_next_idle = p_done_done in
 
   let phase_next =
-    mux2 clear (zero 2)
-      (mux2 is_next_switch (one 2)
-        (mux2 is_next_remove (Signal.of_int ~width:2 2)
-          (mux2 is_next_done (Signal.of_int ~width:2 3)
-              phase)))
+    mux2 clear (zero 3)
+      (mux2 is_next_idle (Signal.of_int ~width:3 0)
+        ((mux2 is_next_load (Signal.of_int ~width:3 1)
+          (mux2 is_next_switch (Signal.of_int ~width:3 2)
+            (mux2 is_next_remove (Signal.of_int ~width:3 3)
+              (mux2 is_next_done (Signal.of_int ~width:3 4)
+                phase))))))
     -- "phase_next"
   in
 
@@ -136,32 +165,32 @@ let create_logic ~clock ~clear ~max_passes (uart_rx: Signal.t Uart.Byte_with_val
   field = cell that really corresponds to a dot/at from the input text *)
   let go_back_to_field0 = clear |: (phase <>: phase_next) in
 
-  let col_next =
+  let col_next_w =
     mux2 go_back_to_field0
       (one 8)
-      (mux2 step_en
+      (mux2 p_remove
         (mux2 last_col
           (one 8)
-          (col +:. 1))
-        col)
-    -- "col_next"
+          (col_remove +:. 1))
+        col_remove)
+    -- "col_next_w"
   in
 
-  let row_next =
+  let row_remove_next =
     mux2 go_back_to_field0
       (one 8)
-      (mux2 step_en
+      (mux2 p_remove
         (mux2 last_col
           (mux2 last_row
             (one 8)
-            (row +:. 1))
-          row)
-        row)
-    -- "row_next"
+            (row_remove +:. 1))
+          row_remove)
+        row_remove)
+    -- "row_remove_next"
   in
 
-  assign col_w col_next;
-  assign row_w row_next;
+  assign col_remove_w col_next_w;
+  assign row_remove_w row_remove_next;
 
   (* cell memory interface *)
 
