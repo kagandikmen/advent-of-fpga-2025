@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 9
  * Created:     2026-01-02
- * Modified:    2026-01-12
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -31,6 +31,8 @@ let%expect_test "day09_test" =
     ~clock
     ~clear
     ~cycles_per_bit
+    ~max_redtiles:64
+    ~max_borders:(1 lsl 17)
     uart_rx_value
   in
 

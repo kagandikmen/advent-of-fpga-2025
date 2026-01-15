@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 8
  * Created:     2025-12-31
- * Modified:    2026-01-12
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -31,6 +31,7 @@ let%expect_test "day08_test" =
     ~clock
     ~clear
     ~cycles_per_bit
+    ~max_vertices:64
     uart_rx_value
   in
 

@@ -2,6 +2,7 @@
 .Xil/
 clockInfo.txt
 *.log
+*.txt
 
 # RTL generation
 outputs/

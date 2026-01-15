@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 11
  * Created:     2026-01-03
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -48,11 +48,8 @@ let ( *^: ) a b = uresize (a *: b) (width a)
 let read_array = Procedure.read_array
 let write_array = Procedure.write_array
 
-let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
+let create_logic ~clock ~clear ~max_nodes ~max_edges (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
-
-  let max_nodes = 512 in
-  let max_edges = 2048 in
 
   let node_addr_w = Math.ceil_log2 max_nodes in
   let edge_addr_w = Math.ceil_log2 max_edges in
@@ -536,12 +533,12 @@ let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   p1_result.value, p2_result.value, (sm.is States.Done), debug_output
 ;;
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~max_nodes ~max_edges uart_rx_value =
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
     ~clear
     ~cycles_per_bit
     uart_rx_value
   in
-  create_logic ~clock ~clear uart_rx
+  create_logic ~clock ~clear ~max_nodes ~max_edges uart_rx
 ;;

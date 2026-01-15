@@ -2,7 +2,7 @@
  *
  * AoF - Arty Top Module & RTL Generator for Day 9
  * Created:     2026-01-13
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -17,6 +17,8 @@ let create _scope (input : _ User_application.I.t) =
     Day09.create_logic
       ~clock:input.clk_166
       ~clear:~:(input.clear_n_166)
+      ~max_redtiles:64
+      ~max_borders:(1 lsl 16)
       input.uart_rx
   in
 

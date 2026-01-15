@@ -1,4 +1,7 @@
 set_param board.repoPaths "boards/"
+
+set_param general.maxThreads 2
+
 set output_dir "outputs/"
 
 open_checkpoint $output_dir/post_synth.dcp

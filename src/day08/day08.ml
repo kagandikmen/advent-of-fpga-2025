@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 8
  * Created:     2025-12-31
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -48,19 +48,18 @@ let sq_u48 d =
   let d48 = uresize d 48 in
   d48 *^: d48
 
-let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
+let create_logic ~clock ~clear ~max_vertices (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
   let p1_mark = 50 in
   let root_search_max_depth = 50 in
 
-  let max_vertices = 256 in
   let max_edges = (max_vertices * (max_vertices - 1)) / 2 in
   let max_edges_ceil_pow2 = 1 lsl (Math.ceil_log2 max_edges) in
 
   let vertex_addr_w = Math.ceil_log2 max_vertices in 
   let edge_addr_w = Math.ceil_log2 max_edges_ceil_pow2 in
-  let edge_len_w = edge_addr_w + 1 in
+  let edge_len_w = edge_addr_w + 2 in
 
   let spec = Reg_spec.create
     ~clock
@@ -608,12 +607,12 @@ let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   total_p1.value, total_p2.value, (sm.is States.Done), debug_output
 ;;
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~max_vertices uart_rx_value =
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
     ~clear
     ~cycles_per_bit
     uart_rx_value
   in
-  create_logic ~clock ~clear uart_rx
+  create_logic ~clock ~clear ~max_vertices uart_rx
 ;;

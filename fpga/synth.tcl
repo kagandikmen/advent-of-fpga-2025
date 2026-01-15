@@ -1,5 +1,7 @@
 set_param board.repoPaths "boards/"
 
+set_param general.maxThreads 2
+
 set board [lindex $argv 0]
 
 switch $board {
@@ -40,3 +42,6 @@ validate_ip [get_ips]
 
 synth_design -top hardcaml_arty_top
 write_checkpoint -force "${::output_dir}/post_synth.dcp"
+
+report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt
+report_utilization -hierarchical -hierarchical_depth 3 -file outputs/post_synth_util_hier3.rpt

@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 6
  * Created:     2025-12-26
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -40,11 +40,9 @@ end
 
 let ( *^: ) (a: Signal.t) (b: Signal.t) : Signal.t = uresize (a *: b) 64
 
-let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
+let create_logic ~clock ~clear ~max_rows ~max_cols (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
-  let max_rows = 8 in
-  let max_cols = 4096 in
   let grid_size = max_rows * max_cols in
 
   let _uart_value = uart_rx.value -- "uart_value" in
@@ -415,13 +413,13 @@ let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   total_p1.value, total_p2.value, (sm.is States.Done)
 ;;
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~max_rows ~max_cols uart_rx_value =
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
     ~clear
     ~cycles_per_bit
     uart_rx_value
   in
-  create_logic ~clock ~clear uart_rx
+  create_logic ~clock ~clear ~max_rows ~max_cols uart_rx
 ;;
 

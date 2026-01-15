@@ -2,7 +2,7 @@
  *
  * AoF - Testbench for the Solution of Day 6
  * Created:     2025-12-26
- * Modified:    2026-01-12
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -32,6 +32,8 @@ let%expect_test "day06_test" =
     ~clock
     ~clear
     ~cycles_per_bit
+    ~max_rows:8
+    ~max_cols:4096
     uart_rx_value
   in
 

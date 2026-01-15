@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 9
  * Created:     2026-01-02
- * Modified:    2026-01-13
+ * Modified:    2026-01-15
  * Author:      Kagan Dikmen
  *
  *)
@@ -30,11 +30,8 @@ let abs a b = mux2 (a >=: b) (a -: b) (b -: a)
 let read_array = Procedure.read_array
 let write_array = Procedure.write_array
 
-let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
+let create_logic ~clock ~clear ~max_redtiles ~max_borders (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
-
-  let max_redtiles = 512 in
-  let max_borders = 1 lsl 20 in
 
   let redtile_addr_w = Math.ceil_log2 max_redtiles in (* 9 *)
   let border_addr_w = Math.ceil_log2 max_borders in (* 9 *)
@@ -386,12 +383,12 @@ let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   p1_result.value, p2_result.value, (sm.is States.Done), debug_output
 ;;
 
-let create ~clock ~clear ~cycles_per_bit uart_rx_value =
+let create ~clock ~clear ~cycles_per_bit ~max_redtiles ~max_borders uart_rx_value =
   let uart_rx = Uart.Expert.create_rx_state_machine
     ~clock
     ~clear
     ~cycles_per_bit
     uart_rx_value
   in
-  create_logic ~clock ~clear uart_rx
+  create_logic ~clock ~clear ~max_redtiles ~max_borders uart_rx
 ;;
