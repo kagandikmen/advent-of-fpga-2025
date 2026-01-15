@@ -17,8 +17,7 @@ let create _scope (input : _ User_application.I.t) =
     Day09.create_logic
       ~clock:input.clk_166
       ~clear:~:(input.clear_n_166)
-      ~max_redtiles:64
-      ~max_borders:(1 lsl 16)
+      ~max_redtiles:512
       input.uart_rx
   in
 

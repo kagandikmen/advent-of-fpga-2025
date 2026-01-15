@@ -31,8 +31,7 @@ let%expect_test "day09_test" =
     ~clock
     ~clear
     ~cycles_per_bit
-    ~max_redtiles:64
-    ~max_borders:(1 lsl 17)
+    ~max_redtiles:512
     uart_rx_value
   in
 
@@ -89,7 +88,7 @@ let%expect_test "day09_test" =
   Out_channel.close vcd_oc;
 
   [%expect {|
-    235621200
-    38609888
+    4781235324
+    1566935900
   |}]
 ;;
