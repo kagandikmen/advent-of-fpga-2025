@@ -78,7 +78,7 @@ opam switch hardcaml
 eval $(opam env)
 ```
 
-to create a new opam switch with the right version, and switch to it. You can also refer to the [Github Actions workflow configuration](.github/workflows/run_tests.yaml) of this repository for the exact specifics of the intented setup.
+to create a new opam switch with the right version, and switch to it. You can also refer to the [Github Actions workflow configuration](.github/workflows/run_tests.yaml) of this repository for the exact specifics of the intended setup.
 
 </details>
 
@@ -146,15 +146,17 @@ to flash your FPGA from the command line.
 
 ### General Principles
 
-I had these three design objectives while solving the puzzles:
+I had three main design objectives while solving the puzzles. Sorted by importance, they are:
 
-- High performance while staying area-considerate (aka "don't use a 512-bit wide multiplier if you don't have to")
-- FPGA deployability (aka "don't make your design a pie in the sky; keep IO & area realistic")
-- No host-side preprocessing of the puzzle input (aka "imagine we have no host-side control")
+1. FPGA deployability (aka "don't make your design a pie in the sky; keep IO & area realistic")
+2. No host-side preprocessing of the puzzle input (aka "imagine you have no host-side control")
+3. High performance while staying area-conscious (aka "make it fast but don't use a 512-bit wide multiplier if you don't have to")
 
-Going through the solutions, you may see one of these objectives being relaxed in favor of another. For example, in the solutions I used a UART bus to transmit the input text from the host to the FPGA, which turned out to be the biggest consumer of cycles in a lot of cases. I kept the UART transmission, however, to keep my designs easily deployable on a relatively-cheap FPGA. Another example would be day 5, where there is minimal host-side preprocessing to packetize the ASCII character stream of the input text. This was to simplify the complicated input parsing logic for that day. Considering a lot of transmission protocols work on the principle of packages anyway, I don't consider this to be an unrealistic exercise.
+Going through the solutions, you may occasionally see a lower-priority objective relaxed in favor of a higher-priority one. For example, in my solutions I used a UART bus to transmit the input text from the host to the FPGA, which turned out to be the biggest consumer of cycles in a lot of cases. I kept the UART transmission, however, to keep my designs easily deployable on a relatively-cheap FPGA. Another example would be day 5, where there is minimal host-side preprocessing to packetize the ASCII character stream of the input text. This was to simplify the complicated input parsing logic for that day. Considering a lot of transmission protocols work on the principle of packages anyway, I don't consider this to be an unrealistic exercise.
 
-Additionally, in a lot of cases I "expect" the host to send the ASCII control character for "start of text" (STX, 0x02) before sending the puzzle input text. Likewise, I expect it to send "end of text" (ETX, 0x03) right after. However, I don't consider this to be host-side control, for me it is rather a reasonable expectation from the host.
+Additionally, in a lot of cases I "expect" the host to send the ASCII control character for "start of text" (STX, 0x02) before sending the puzzle input text. Likewise, I expect it to send "end of text" (ETX, 0x03) right after. However, this is fairly innocent input framing in my opinion, which entails no host-side processing.
+
+Finally, solutions for day 8 and day 11 are validated using reduced inputs due to simulation runtime.
 
 Below are the implementation details for the daily puzzles I worked on. They are all split into these three subsections: Summary, My Solution, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. In the final subsection, "Suggestions", I mostly share my observations and how you could improve on my solution.
 
@@ -165,10 +167,10 @@ Below are the implementation details for the daily puzzles I worked on. They are
 
 ### Summary
 
-The puzzle of day 1 consists of two steps. For a given turning sequence, it needs to be computed:
+The puzzle of day 1 consists of two parts. For a given turning sequence, it needs to be computed:
 
-- how many times the lock mechanism of a door stops at zero (Step 1)
-- how many times the lock mechanism of a door hits zero (Step 2)
+- how many times the lock mechanism of a door stops at zero (Part 1)
+- how many times the lock mechanism of a door hits zero (Part 2)
 
 The key detail is that it is a circular lock that is being turned. So the counter wraps at 100. (0 and 99 are neighbors.)
 
@@ -217,8 +219,8 @@ To avoid costly division logic, I used a 10-step subtraction routine instead of 
 
 The puzzle of day 2 also consists of two parts. For any given range, the hardware needs to compute how many integers are in the range with a digit sequence
 
-- that is a subsequence repeating itself twice (Step 1)
-- that is a subsequence repeating itself **at least** twice (Step 2)
+- that is a subsequence repeating itself twice (Part 1)
+- that is a subsequence repeating itself **at least** twice (Part 2)
 
 ### My Solution
 
@@ -247,11 +249,11 @@ module Compute_states = struct
 end
 ```
 
-At program start, the FPGA is in state `Idle` where it listens to the UART bus for the ASCII control character "start of text." After sending this character, the host sends the puzzle input text with no preprocessing. The flowing characters are registered as valid input data on the FPGA side, which is now in `Receive` state. The FPGA parses the incoming characters and saves the received range bounds into two FIFOs, one for lower bounds and one for upper bounds. The values are converted into binary coded decimal (BCD) before being saved. When the host sends the character "end of text," the FPGA moves onto the state `Compute` where it waits for the processing engine to complete bound processing. Once the processing engine is back in idle state, the main state machine concludes everything by moving further to its state `Done`.
+At program start, the FPGA is in state `Idle` where it listens to the UART bus for the ASCII control character "start of text." After sending this character, the host sends the puzzle input text with no preprocessing. The flowing characters are registered as valid input data on the FPGA side, which is now in `Receive` state. The FPGA parses the incoming characters and saves the received range bounds into two FIFOs, one for lower bounds and one for upper bounds. The values are converted into binary coded decimal (BCD) using the double dabble algorithm before being saved. When the host sends the character "end of text," the FPGA moves onto the state `Compute` where it waits for the processing engine to complete bound processing. Once the processing engine is back in idle state, the main state machine concludes everything by moving further to its state `Done`.
 
 The moving of the processing engine out of `Idle` is triggered by the arrival of first bounds in the FIFOs. The biggest advantage here is that the processing engines don't need to wait for full input arrival. Once the first bounds are received, they can start computing while the other bounds are still being transmitted.
 
-The processing engine does not check every single integer in the range to figure out if it is silly and/or goofy. That is sometimes billions of integers to check. Therefore, the processing engine comes from the other side. It goes through all silly/goofy numbers and checks if they are in the given integer range. This is done in state `Evaluate` of the processing engine, and it has proven to be the faster approach.
+The processing engine does not check every single integer in the range to figure out if it is silly and/or goofy. That is sometimes billions of integers to check. Therefore, the processing engine comes from the other side. It goes through all silly/goofy numbers and checks if they are in the given integer range. This is done in state `Evaluate` of the processing engine, and it has proven to be the faster approach. The other states of the processing engine are all transitional or related to bookkeeping.
 
 In my [older solution](src/old/day02/day02.ml) for this puzzle, I was:
 
@@ -263,7 +265,7 @@ Horrible solution, I know. The new one is incomparably better.
 
 ### Suggestions
 
-Because the UART transmission continues running "in the background" while the first ranges are already being processed, the UART transmission is not the performance bottleneck in this application. The by far longest chunk of execution is the evaluation state of the processing engine. Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. In the end, the set of all silly/goofy numbers does not change from range to range. However, I don't know what kind of effect this would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify it. You can try this out and let me know, don't hesitate to create an issue or pull request.
+The UART transmission continues running in parallel while the first ranges are already being processed. Considering this with the fact that processing one range takes much longer than just receiving it, the UART transmission is not the performance bottleneck in this application. The by far biggest chunk of execution is the evaluation state of the processing engine. Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. In the end, the set of all silly/goofy numbers does not change from range to range. However, I don't know what kind of effect this would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify it. You can try this out and let me know; don't hesitate to create an issue or pull request.
 
 <br><br><br></details>
 
@@ -274,20 +276,19 @@ Because the UART transmission continues running "in the background" while the fi
 
 ### Summary
 
-The puzzle of day 3 also consists of two parts. For any given digit sequence, the puzzle requires us to compute what is the highest achievable value after deleting a given number of digits. In the first parts, 2 digits are left; in the second part, 12 are left.
+The puzzle of day 3 also consists of two parts. For any given digit sequence, the puzzle requires us to compute what is the highest achievable value after deleting a certain number of digits. In the first part, 2 digits are left; in the second part, 12 are left.
 
 ### My Solution
 
-In [my solution](src/day03/day03.ml), the raw text input received through the UART bus is processed as digits arrive one by one. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first part of the puzzle. 88 of them for the second part, likewise. For any given number of digits to leave, k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are converted to decimal and added to a running total.
+**IMPORTANT:** For further reference, I named the number of digits to leave "k." So, for the first part, k is equal to 2; for the second part, k is equal to 12.
+
+[My solution](src/day03/day03.ml) for day 3 is a stateless one. In this stateless solution, the raw text input received through the UART bus is processed as digits arrive one by one. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first part of the puzzle. 88 of them for the second part, likewise. For any given k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are added to a running total.
 
 ### Suggestions
 
-My implementation hardcodes the bank width 100 to the logic. Although this is easily changeable in the source code, one may want a design capable to adjust itself for different sequence widths. I can think of two ways:
+My implementation hardcodes the bank width, 100, into the logic. Although this is easily changeable in the source code, one may want a design capable of adjusting itself to different bank widths. This could be managed by first saving the bank(s) in the FPGA and then processing the digits one by one, but this would both require storage and reduce performance. In the most ideal case, the digit sequences are processed "on the go" as they arrive without introduction of hardcoded widths, arrays, RAMs, FIFOs, or state machines. I considered all these additional components, and decided for this case that hardcoding the bank width was the least harmful. If you can come up with a solution including none of those; don't hesitate to create an issue or pull request.
 
-- **Accepting the whole sequence, and then starting the computation:** In such an implementation all digits of the sequence would first be transmitted and saved by the FPGA. Once the FPGA is "notified" that the transmission is completed, it would start to iterate over the digits from the most significant to the least significant.
-- **Sending the sequence width beforehand:** In such an implementation the host would first send the width of the sequence and then start sending the digits one by one. The digits would still all be processed immediately on arrival.
-
-I personally like the second much more. The first one asks for a lot more memory, and requires back-and-forth communication between the host and the FPGA. Not to mention one will have to set a maximum sequence width anyways, as the number of registers is fixed at design time. The second one handles the problem with much less memory overhead, and it does not require the host to wait for a done signal from the FPGA either. As both approaches require host-side processing, I opted for neither of them.
+Nevertheless, the number of digits to leave, k, is not hardcoded. It is a parameter of the `create` function. So, my solution is actually in no way tailored to the first or second part of the puzzle. If you wonder what the result would be for k = 3, just set k three!
 
 <br><br><br></details>
 
@@ -298,13 +299,13 @@ I personally like the second much more. The first one asks for a lot more memory
 
 ### Summary
 
-The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in this case. The first step asks for how many vertices are removed in the first iteration, whereas the second step asks for how many are removed for an iteration count approaching infinity.
+The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in this case. The first part asks for how many vertices are removed in the first iteration, whereas the second part asks for how many are removed for an iteration count approaching infinity.
 
 ### My Solution
 
 [My solution](src/day04/day04.ml) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
 
-- **IDLE**: In this initial state, the FPGA does nothing other than listening to the UART bus for the trigger signal, the ASCII control character for "start of text." When it arrives, the FSM moves onto state LOAD.
+- **IDLE**: In this initial state, the FPGA does nothing other than listening to the UART bus for the trigger signal, the ASCII control character for "start of text." When it arrives, the FSM moves onto the state LOAD.
 - **LOAD**: In this state, all field info is loaded onto the FPGA. The puzzle input is transmitted by the host through the UART bus with zero preprocessing. If the FPGA registers the inflowing 8-bit value as a valid ASCII character, it stores it in a 256x256 grid storage. Each "cell" of the grid has the following structure:
 
 ```ocaml
@@ -319,33 +320,33 @@ module Cell = struct
 end
 ```
 
-Both `is_roll` and `removed_this_pass` are 1-bit wide. The state LOAD only writes `is_roll` though, `removed_this_pass` is modified in the state REMOVE. In this state, the FPGA also figures out the dimensionality of the input, which means it detects how many rows and columns of characters there are in the input text. After the loading of all input fields is complete, the FSM continues with the other states.
+Both `is_roll` and `removed_this_pass` are 1-bit wide. The state LOAD only writes `is_roll` though, `removed_this_pass` is modified in the state REMOVE. In LOAD, the FPGA also figures out the dimensionality of the input, which means it detects how many rows and columns of characters there are in the input text. After the loading of all input fields is complete, the FSM continues with the other states.
 
-- **SWITCH**: This state takes up only one cycle and acts as a "bookkeeping step" after each remove pass is completed. If it is preceded by the state LOAD it fulfills no significant functionality.
+- **REMOVE**: This state iterates over all cells, and sets their `is_roll` field zero if they are both occupied by a roll and can be accessed according to the rules of the puzzle. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of remove passes is achieved. If so, then the FSM moves onto DONE. If not, then it goes to SWITCH for the evaluation of the current remove pass and the transition to the next one. The number of removed rolls is accumulated in the register `total_removed`.
 
-- **REMOVE**: This state iterates over all cells, and sets their `is_roll` field zero if they are both occupied by a roll and can be accessed according to the rules of the puzzle. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of remove passes is achieved. If so, then the FSM moves onto DONE. If not, then it returns back to SWITCH for the evaluation of the current remove pass and the transition to the next one. The number of removed rolls is accumulated in the register `total_removed`.
+- **SWITCH**: This state takes up only one cycle and acts as a "bookkeeping step" after each remove pass is completed. After this one cycle, the FSM returns back to REMOVE for the next remove pass if the required number of passes is not yet achieved.
 
 - **DONE**: This is the state the logic arrives at after breaking from the REMOVE-SWITCH loop. The FPGA signals back to the host that the computation is done, so the host knows that `total_removed` is stabilized.
 
-If `max_passes` is set to zero, the remove passes continue forever until there are no more rolls to remove. For the first part of the puzzle, `max_passes` is set to one. For the second part, it is set to zero.
+If `max_passes` is set to zero, the remove passes continue forever until there are no removable rolls left. For the first part of the puzzle, `max_passes` is set to one. For the second part, it is set to zero.
 
 In my [older solution](src/old/day04/day04.ml) for this puzzle, I was:
 
 - first saving all the values into the grid likewise (LOAD)
-- then going through all the cells of the grid to mark the cells 'accessible' or not (MARK)
-- then going through all the cells once again to remove the rolls in the cells marked accessible (REMOVE)
+- then going through all the cells of the grid to mark the rolls 'accessible' or not (MARK)
+- then going through all the cells once again to remove the rolls marked accessible (REMOVE)
 
 Because this involved iterating twice over the grid for each remove pass, it was very inefficient and significantly slower. After moving to this new solution I have seen a 9.4% acceleration for the first part of the puzzle and a 36.5% acceleration for the second part.
 
-I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accomodate row counts and column counts upto 256, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
+I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accommodate row counts and column counts up to 256, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
 
 ### Suggestions
 
-Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so I don't estimate any excessive memory/area footprint for my solution.
+Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so my solution does not have an excessive memory/area footprint, either.
 
-The waveforms reveal that the biggest performance bottleneck of the application is the UART transmission, but I intend to keep the UART bus as FPGA deployability is one of my main design goals.
+The waveforms reveal that the biggest performance bottleneck of the application is the UART transmission, but I intend to keep the UART bus as FPGA deployability is my biggest design objective. Nevertheless, if you are bound by different design objectives and constraints, the host-FPGA data transmission is the part of the solution you should look at first.
 
-What I especially like about this solution is that it is actually in no way tailored to part 1 or 2 of the puzzle. If you are curious about how many rolls are removed after three remove passes, just set `max_passes` three!
+What I especially like about this solution is that it is actually in no way tailored to part 1 or 2 of the puzzle. `max_passes` is a design parameter that goes into the `create` function. If you are curious about how many rolls would be removed after three remove passes, just set `max_passes` three!
 
 <br><br><br></details>
 
@@ -356,7 +357,7 @@ What I especially like about this solution is that it is actually in no way tail
 
 ### Summary
 
-Like the others, the puzzle for day 5 consists of two steps. It is based on a text input that consists of lines that are either integers (IDs) or integer ranges. In the first step, it is computed how many of the IDs fall on at least one of the ranges. In the second step, it is computed how many integers in general fall on at least one of the ranges. The main challenge, especially in step two, is that the ranges both overlap and come unsorted.
+Like the others, the puzzle for day 5 consists of two parts. It is based on a text input that consists of lines that are either integers (IDs) or integer ranges. In the first part, it is computed how many of the IDs fall on at least one of the ranges. In the second part, it is computed how many integers in general fall on at least one of the ranges. The main challenge, especially in part two, is that the ranges both overlap and come unsorted.
 
 ### My Solution
 
@@ -387,9 +388,7 @@ The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the
 
 ### Suggestions
 
-I don't know how it could be done, but a better sorting & merging algorithm would be much appreciated. Sorting is not particularly hardware-friendly. Selection sort, the sorting algorithm I implemented, has a time complexity of O(n^2). If there is any possibility to sort the ranges before feeding them into the FPGA, this would prevent a lot of computation & logic complexity from happening in the first place.
-
-Another suggestion could be made about the packaging, in case we are on a quest to save every single cycle possible. The section change and EOF signals do not send any meaningful payload, but the FPGA waits for this payload to be fully sent before going forward with the signaled operation. In current implementation, the host fills the payload field with zeros. This is not even remotely the performance bottleneck of the application, but fixing it would save a couple cycles.
+One suggestion could be made about the packetization, in case we are on a quest to save every single cycle possible. The section change and EOF signals do not send any meaningful payload, but the FPGA waits for this payload to be fully sent before going forward with the signaled operation. In current implementation, the host fills the payload field with zeros. This is not even remotely the performance bottleneck of the application, but fixing it would save a couple cycles.
 
 <br><br><br></details>
 
@@ -400,17 +399,42 @@ Another suggestion could be made about the packaging, in case we are on a quest 
 
 ### Summary
 
-Like the others, the puzzle for day 6 consists of two parts. It is based on a text input that consists of a matrix of integers, followed by a final row of operation signs. (Either addition or multiplication in this case.) The integers (and the operator) that are found in the same column belong to each other and constitute an operation. (I called this union of integers and operator an "opblock.") In part 1, the integers are to be parsed left to right, whereas in part 2 they are parsed from top to bottom.
+Like the others, the puzzle for day 6 consists of two parts. It is based on a text input that consists of a matrix of integers, followed by a final row of operation signs. (Either addition or multiplication in this case.) The integers (and the operator) that are found in the same vertical stack belong to each other and constitute an operation. In part 1, the integers are to be parsed left to right, whereas in part 2 they are parsed from top to bottom.
 
 ### My Solution
 
-[My solution](src/day06/day06.ml) starts its life in `Idle` state and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text," the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero preprocessing this time) one by one in its RAM.
+**IMPORTANT:** For further reference, I named this union of integers and operator in the same stack an "opblock." In the AoC puzzle input, each opblock consists of three integer values and an operator.
 
-When the host transfers the ASCII value "end of text," the FPGA moves onto the state `Find_opblk_start`. Then moving further onto the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which column the next opblock starts and ends. (Bear in mind our columns are one character wide.) Once the borders are figured out, the FPGA continues with the states `Setup_compute` and `Compute`, the latter of which activates the "secondary state machines." These secondary state machines are another type of state machine, which we instantiate twice. They work simultaneously; and they only differ in the specifics of the computation one of their states includes. The first state machine is for part 1, and the second is for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
+[My solution](src/day06/day06.ml) starts its life in `Idle` state (The full state machine is below.) and immediately starts listening to the UART bus. When the host sends the ASCII value for "start of text," the FPGA transfers into the state `Receive`. In this state, the FPGA saves the characters of the incoming text (with zero host-side preprocessing) one by one in its RAM.
+
+```ocaml
+module States = struct
+  type t =
+    | Idle
+    | Receive
+    | Find_opblk_start
+    | Find_opblk_end
+    | Setup_compute
+    | Compute
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+
+module Secondary_states = struct
+  type t =
+    | Idle
+    | Retrieve
+    | Accumulate
+    | Done
+  [@@deriving sexp_of, compare, enumerate]
+end
+```
+
+When the host transfers the ASCII value "end of text," the FPGA moves onto the state `Find_opblk_start`. Combined with the state `Find_opblk_end`, the FPGA iterates over all columns to figure out at which columns the next opblock starts and ends. (Don't confuse columns with stacks or opblocks, columns are one character wide. Think of the input text as a matrix of ASCII characters.) Once the opblock borders are figured out, the FPGA continues with the states `Setup_compute` and `Compute`, the latter of which activates the "secondary state machines." These secondary state machines are another type of state machine, which we instantiate twice. They work simultaneously; and they only differ in the specifics of the computation one of their states includes. The first state machine computes for part 1, and the second computes for part 2. So, for each opblock, the parts 1 and 2 are computed in parallel, saving latency.
 
 When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the loop: `Find_opblk_start`-`Find_opblk_end`-`Setup_compute`-`Compute`. After all opblocks are processed this way, the running totals are returned to the host.
 
-There was an [older solution](src/old/day06/day06.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. As it takes linear time to index, read, or write to arrays, this older implementation was embarrassingly slow. The random access into the "character memory" as offered by the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour.
+There was an [older solution](src/old/day06/day06.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. This older array-based implementation had an exceedingly high simulation runtime, simulating the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour. Nevertheless, they are equivalent in terms of FPGA performance.
 
 ### Suggestions
 
@@ -418,9 +442,9 @@ I feel like the main state machine could be made more compact by removing the st
 
 Another idea would be to implement "opblock engines" for each opblock received/saved. Iterating over the rows (either during transmission or after it,) each value on the row would be sent to its dedicated opblock engine, which would both add and multiply all the operands as they come. Once the final row arrives with the correct operation, the opblock engine would then already have the result and return it immediately. 
 
-The biggest performance bottleneck of the new version of the application is the UART transmission, which consumes around 95% of the cycles. I intend to keep the UART bus for seamless FPGA deployment in the future. In case your situation allows you to opt for a parallel (or simply faster) protocol, this opblock engines idea would be worth considering.
+The biggest performance bottleneck of the new version of the application is the UART transmission, which consumes around 95% of the cycles. I intend to keep the UART bus for seamless FPGA deployment in the future, which is one of my three main design objectives. In case your situation allows you to opt for a parallel (or simply faster) protocol, this opblock engines idea would be worth considering.
 
-But all this under a condition: As the relation "columns per row" grows, this idea of parallel processing could prove impractical due to power and/or area concerns.
+But all this under a condition: As the relation "opblocks per row" grows, this idea of parallel processing could prove impractical due to power and/or area concerns.
 
 <br><br><br></details>
 
@@ -431,7 +455,7 @@ But all this under a condition: As the relation "columns per row" grows, this id
 
 ### Summary
 
-The part 1 of the seventh puzzle requires us to find how many times a beam split event happens in a given positioning of beam inputs and splitters. The second part requires the computation of how many alternative paths there are for a beam to follow from the beginning (top) until the end (bottom.)
+The part 1 of the seventh puzzle requires us to find how many times a beam split event happens in a given positioning of beam inputs and splitters in a 2D space. The second part requires the computation of how many alternative paths there are for a beam to follow from the beginning (top) until the end (bottom.)
 
 ### My Solution
 
@@ -462,7 +486,7 @@ The main state machine starts at state `Idle` and listens to the UART bus for th
 
 The compute engine, which has the simple state machine `Idle` <-> `Compute_row`, fulfills the function of reading latest row from the FIFO, analyzing it, and updating various registers to keep track of the current state of the computation. It sits idle while the FIFO is empty, whereas it transfers to `Compute_row` when there is any row data in the FIFO.
 
-This approach with two state machines enables a great deal of parallelism. The rows are processed as they come; they are not first saved and then processed in bulk, which would cost a lot of performance and area. Moreover, the compute engine processes all columns of the row in parallel (by taking account of what happens in the neighbor columns), which also brings about a great deal of performance gains. This way, the entire row is processed in a single cycle!
+This approach with two state machines enables a great deal of parallelism. The rows are processed as they come; they are not first saved and then processed in bulk, which would cost a lot of performance and area. Moreover, the compute engine processes all columns of the row in parallel (by taking account of what happens in the neighbor columns), which also brings about a great deal of performance gains.
 
 In fact, I had an [older solution](src/old/day07/day07.ml) for this puzzle where I used to:
 
@@ -474,14 +498,14 @@ This was of course neither an elegant solution nor efficient. The performance co
 
 |           | Total Time (us) | Time After End of Receive (us) |
 |-----------|-----------------|--------------------------------|
-| **Old**   | 9075            | 202.02                         |
 | **New**   | 8874            | 1.02                           |
+| **Old**   | 9075            | 202.02                         |
 
 Because the total execution is dominated by the UART transmission, the total time is reduced by 2% only. However, the time spent after the UART transmission is reduced by 99.5% with the newer solution.
 
 ### Suggestions
 
-The table above displays very well what the main performance bottleneck of the application is: the UART transmission. I will keep the UART bus because one of my main design goals is FPGA deployability, but feel free to attack the data transmission if you are bound by different concerns and constraints. You may need to adjust the FIFO depth in case your transmission bandwidth is higher.
+The table above displays very well what the main performance bottleneck of the application is: the UART transmission. I will keep the UART bus because one of my main design objectives is FPGA deployability, but feel free to attack the data transmission if you are bound by different concerns and constraints. You may need to adjust the FIFO depth in case your transmission bandwidth is higher.
 
 One of the great things about this solution is that it actually does not put any limit on how many rows the input text is allowed to have. The AoC puzzle input has 142 rows like it has 142 columns, but the Hardcaml solution is able to continue until its 64-bit `cur_rays` registers or result registers are overflowed.
 
@@ -502,7 +526,7 @@ For the puzzle of day 8 we have points in 3D space. And these points need to be 
 
 After all distances are computed, the FPGA sorts the connections by ascending distance. For this, I used bitonic sort because of its somewhat hardware-friendly nature. 
 
-The logic then continues by initiating the "graph," which is just two arrays in this case. The idea is similar to what I implemented in [my Python reference solution](test/day08/ref.py), which is basically [Kruskal's algorithm](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm). In this application of the algorithm, we treat the points as the vertices of a graph, and the connections between them as the edges. We use two arrays (lists in Python,) both with a size equal to the number of points. The first array is called `parents` and stores the parent of each vertex. For each circuit one of the vertices is the "eldest parent" or "root," which means it directly or indirectly fathers all the other vertices in the circuit. (It actually does not matter much which vertex the root is.) The second array is called `sizes` and for each root vertex it stores the size of its circuit. For vertices that are not the root of the circuit, the size array does not store any meaningful value.
+The logic then continues by initiating the "graph," which is just two arrays in this case. The idea is similar to what I implemented in [my Python reference solution](test/day08/ref.py), which is basically [Kruskal's algorithm](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm). In this application of the algorithm, we treat the points as the vertices of a graph, and the connections between them as the edges. We use two arrays (lists in Python) both with a size equal to the number of points. The first array is called `parents` and stores the parent of each vertex. For each circuit one of the vertices is the "eldest parent" or "root," which means it directly or indirectly fathers all the other vertices in the circuit. (It actually does not matter much which vertex the root is.) The second array is called `sizes` and for each root vertex it stores the size of its circuit. For vertices that are not the root of the circuit, the size array does not store any meaningful value.
 
 After the bitonic sort, the FPGA continues by setting the graph up, and then it starts fetching the possible connections one by one, starting from the shortest-distance one. If the vertices are not already in the same circuit, their circuits are merged. Once all vertices are part of the same circuit, the FPGA concludes the computation. As usual, the host is notified for the end of computation through a done signal.
 
@@ -523,7 +547,7 @@ I observed that the main performance bottleneck of the application is the sortin
 
 ### Summary
 
-For the puzzle of day 9 we work on a matrix of "tiles," which are either red, green, or another irrelevant color. The tiles are ordered in a way so that the red ones constitute a polygon when they are virtually connected with each other consecutively. This polygon is then, including its borders but not its corners, filled with green tiles. The first part of the puzzle asks for the area of the biggest rectangle with red tiles as two of its opposite corners. The second part adds a criteria and asks for the area of the biggest rectangle with opposite red corners and a fully red-green surface.
+For the puzzle of day 9 we work on a matrix of "tiles," which are either red, green, or another irrelevant color. The tiles are ordered in a way so that the red ones constitute a polygon when they are virtually connected with each other consecutively. This polygon is then, including its borders but not its corners, filled with green tiles. The first part of the puzzle asks for the area of the biggest rectangle with two red tiles as two of its opposite corners. The second part adds a criteria and asks for the area of the biggest rectangle with opposite red corners and a fully red-green surface.
 
 ### My Solution
 
@@ -540,23 +564,23 @@ module States = struct
 end
 ```
 
-My design first receives raw text input through the UART bus (In alignment with the ASCII standard, `0x02` means start of text, and `0x03` means end of text.) The FPGA starts its execution in the `Idle` state and immediately starts listening for the start of text character. At the moment of its detection, the design transfers to the state `Receive` and starts saving received values into arrays for x and y coordinates. The coordinates of the red tiles are also saved into a double-port RAM. When the end of text character is received, the FPGA moves onto the state `Compute`. In this state, the FPGA iterates over all two-combinations of the red tile set with no duplicate pairs, of course. Each pair form a virtual rectangle, and for each one of these virtual rectangles we compute:
+My design first receives raw text input through the UART bus (In alignment with the ASCII standard, `0x02` means "start of text", and `0x03` means "end of text.") The FPGA starts its execution in the `Idle` state and immediately starts listening for the start of text character. At the moment of its detection, the design transfers to the state `Receive` and starts saving received values into arrays for x and y coordinates. These coordinates of the red tiles are also saved into a double-port RAM. When the end of text character is received, the FPGA moves onto the state `Compute`. In this state, the FPGA iterates over all two-combinations of red tiles, which I call "corner pairs" for further reference. Each corner pair forms a virtual rectangle, and for each one of these virtual rectangles we compute:
 
 - area,
-- whether there is any border inside, formed by two subsequent red tiles.
+- whether there is any border inside, formed by two consecutive red tiles.
 
-The all two-combinations of the red tile set are read from the arrays. For each two-combination, all subsequent red tile pairs need to be checked to see if the border edge formed by them stays inside the rectangle. For this border computation, the subsequent red tile pairs are read from the double-port RAM. (This is the reason behind the existence of both the arrays and the RAM. For each tile pair, we have to iterate through all the other tiles two at a time.)
+The coordinates of the corner pairs are read from the arrays. For each corner pair, all red tiles need to be checked to see if any two consecutive tiles form a border edge that stays inside the virtual rectangle. For this border computation, the consecutive red tile pairs are read from the double-port RAM. (This is the reason behind the existence of both the arrays and the RAM. For each corner pair, we have to iterate through all the other tiles two at a time.)
 
-When all combinations are finally processed, the FPGA transfers to the `Done` state and concludes the computation. As usual, the host is notified about this using a done signal.
+When all scenarios are finally processed, the FPGA transfers to the `Done` state and concludes the computation. As usual, the host is notified about this using a done signal.
 
 In my [older solution](src/old/day09/day09.ml), I used to:
 
 - First receive the coordinates,
 - Save them into the arrays,
-- Then move onto a state `Find_borders`, where I crawled between consequent red tiles and saved the coordinates of every single border tile into a single-port RAM (which means ~70k coordinates,)
-- Then for each two-combination of red tiles, go through the entire RAM to see if any of the border tiles is inside.
+- Then move onto a state named `Find_borders`, where I crawled between consecutive red tiles and saved the coordinates of every single border tile in between into a single-port RAM (which means ~70k coordinates,)
+- Then for each corner pair, go through the entire RAM to see if any of the border tiles is inside the virtual rectangle.
 
-This was incomparably slower and more area-hungry than my current solution, of course. In fact, I wasn't even able to run the entire text input for time concerns. For the same small toy input of 50 red tiles, I have seen the execution time drop from 62550 us to 360 us after moving to the newer solution, which constitutes a 99.4% acceleration.
+This was orders of magnitude slower and more area-hungry than my current solution, of course. In fact, I wasn't even able to run the entire text input due to time concerns. For the same small toy input of 50 red tiles, I have seen the execution time drop from 62550 us to 360 us after moving to the newer solution, which constitutes a 99.4% acceleration.
 
 ### Suggestions
 
@@ -591,13 +615,13 @@ NP: number of paths
 So, after the topological sorted order is complete, the FPGA does three passes over this order to compute:
 
 ```text
-NP(you -> out)
-NP(svr -> dac)
-NP(svr -> fft)
-NP(dac -> fft)
-NP(fft -> dac)
-NP(dac -> out)
-NP(fft -> out)
+NP(you -> out)    # For Part 1
+NP(svr -> dac)    # For Part 2
+NP(svr -> fft)    # For Part 2
+NP(dac -> fft)    # For Part 2
+NP(fft -> dac)    # For Part 2
+NP(dac -> out)    # For Part 2
+NP(fft -> out)    # For Part 2
 ```
 
 Finally, these values are used to compute the values required for both parts of the puzzle, and then the host is notified with a done signal.
