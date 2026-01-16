@@ -290,7 +290,8 @@ The puzzle of day 4 requires us to solve a k-core peeling algorithm; 4-core in t
 
 [My solution](src/day04/day04.ml) implements an iterative, multi-pass, memory-resident algorithm with the following finite state machine:
 
-- **LOAD**: In this state, all field info is loaded onto the FPGA. The puzzle input is transmitted by the host through the UART bus with zero preprocessing. If the FPGA registers the inflowing 8-bit value as a valid ASCII character, it stores it in a 140x140 grid storage. Each "cell" of the grid has the following structure:
+- **IDLE**: In this initial state, the FPGA does nothing other than listening to the UART bus for the trigger signal, the ASCII control character for "start of text." When it arrives, the FSM moves onto state LOAD.
+- **LOAD**: In this state, all field info is loaded onto the FPGA. The puzzle input is transmitted by the host through the UART bus with zero preprocessing. If the FPGA registers the inflowing 8-bit value as a valid ASCII character, it stores it in a 256x256 grid storage. Each "cell" of the grid has the following structure:
 
 ```ocaml
 module Cell = struct
@@ -304,10 +305,12 @@ module Cell = struct
 end
 ```
 
-Both `is_roll` and `removed_this_pass` are 1-bit wide. The state LOAD only writes `is_roll` though, `removed_this_pass` is modified in the state REMOVE. After the loading of all input fields is complete, the FSM continues with the other states.
+Both `is_roll` and `removed_this_pass` are 1-bit wide. The state LOAD only writes `is_roll` though, `removed_this_pass` is modified in the state REMOVE. In this state, the FPGA also figures out the dimensionality of the input, which means it detects how many rows and columns of characters there are in the input text. After the loading of all input fields is complete, the FSM continues with the other states.
 
 - **SWITCH**: This state takes up only one cycle and acts as a "bookkeeping step" after each remove pass is completed. If it is preceded by the state LOAD it fulfills no significant functionality.
+
 - **REMOVE**: This state iterates over all cells, and sets their `is_roll` field zero if they are both occupied by a roll and can be accessed according to the rules of the puzzle. (This is essentially "removing the paper roll.") Once the iteration is done, the logic checks if `max_passes` number of remove passes is achieved. If so, then the FSM moves onto DONE. If not, then it returns back to SWITCH for the evaluation of the current remove pass and the transition to the next one. The number of removed rolls is accumulated in the register `total_removed`.
+
 - **DONE**: This is the state the logic arrives at after breaking from the REMOVE-SWITCH loop. The FPGA signals back to the host that the computation is done, so the host knows that `total_removed` is stabilized.
 
 If `max_passes` is set to zero, the remove passes continue forever until there are no more rolls to remove. For the first part of the puzzle, `max_passes` is set to one. For the second part, it is set to zero.
@@ -320,9 +323,11 @@ In my [older solution](src/old/day04/day04.ml) for this puzzle, I was:
 
 Because this involved iterating twice over the grid for each remove pass, it was very inefficient and significantly slower. After moving to this new solution I have seen a 9.4% acceleration for the first part of the puzzle and a 36.5% acceleration for the second part.
 
+I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accomodate row counts and column counts upto 256, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
+
 ### Suggestions
 
-Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the 140x140 grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so I don't estimate any excessive memory/area footprint for my solution.
+Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so I don't estimate any excessive memory/area footprint for my solution.
 
 The waveforms reveal that the biggest performance bottleneck of the application is the UART transmission, but I intend to keep the UART bus as FPGA deployability is one of my main design goals.
 
@@ -515,49 +520,33 @@ module States = struct
   type t =
     | Idle
     | Receive
-    | Find_borders
     | Compute
     | Done
   [@@deriving sexp_of, compare, enumerate]
 end
 ```
 
-My design first receives raw text input through the UART bus (In alignment with the ASCII standard, `0x02` means start of text, and `0x03` means end of text.) The FPGA starts its execution in the `Idle` state and immediately starts listening for the start of text character. At the moment of its detection, the design transfers to the state `Receive` and starts saving received values into arrays for x and y coordinates. When the end of text character is received, the FPGA moves onto the state `Find_borders`. In this state, it iterates over all the received red tile coordinates and marks the tiles between them as "border tiles." For example, if we have the red tile constellation:
-
-```text
-..............
-......2..3....
-..............
-...0..1.......
-..............
-...5.....4....
-..............
-```
-
-It marks the tiles marked with `x` as border tiles:
-
-```text
-..............
-......2xx3....
-......x..x....
-...0xx1..x....
-...x.....x....
-...5xxxxx4....
-..............
-```
-
-The coordinates of the border tiles are saved into a single-port RAM. Once all borders are figured out, the logic transfers to the state `Compute` where it iterates over all two-combinations of the red tile set with no duplicate pairs, of course. Each pair form a virtual rectangle, and for each one of these virtual rectangles we compute:
+My design first receives raw text input through the UART bus (In alignment with the ASCII standard, `0x02` means start of text, and `0x03` means end of text.) The FPGA starts its execution in the `Idle` state and immediately starts listening for the start of text character. At the moment of its detection, the design transfers to the state `Receive` and starts saving received values into arrays for x and y coordinates. The coordinates of the red tiles are also saved into a double-port RAM. When the end of text character is received, the FPGA moves onto the state `Compute`. In this state, the FPGA iterates over all two-combinations of the red tile set with no duplicate pairs, of course. Each pair form a virtual rectangle, and for each one of these virtual rectangles we compute:
 
 - area,
-- whether there is any border tile inside.
+- whether there is any border inside, formed by two subsequent red tiles.
+
+The all two-combinations of the red tile set are read from the arrays. For each two-combination, all subsequent red tile pairs need to be checked to see if the border edge formed by them stays inside the rectangle. For this border computation, the subsequent red tile pairs are read from the double-port RAM. (This is the reason behind the existence of both the arrays and the RAM. For each tile pair, we have to iterate through all the other tiles two at a time.)
 
 When all combinations are finally processed, the FPGA transfers to the `Done` state and concludes the computation. As usual, the host is notified about this using a done signal.
 
+In my [older solution](src/old/day09/day09.ml), I used to:
+
+- First receive the coordinates,
+- Save them into the arrays,
+- Then move onto a state `Find_borders`, where I crawled between consequent red tiles and saved the coordinates of every single border tile into a single-port RAM (which means ~70k coordinates,)
+- Then for each two-combination of red tiles, go through the entire RAM to see if any of the border tiles is inside.
+
+This was incomparably slower and more area-hungry than my current solution, of course. In fact, I wasn't even able to run the entire text input for time concerns. For the same small toy input of 50 red tiles, I have seen the execution time drop from 62550 us to 360 us after moving to the newer solution, which constitutes a 99.4% acceleration.
+
 ### Suggestions
 
-I think the computation in the state `Compute` can be parallelized by delegating it into "computation engines," and I don't even estimate this to be a hard task. I am planning to come back to this puzzle to do this, because the `Compute` state is by far the biggest performance bottleneck of the application.
-
-Another thing: To make testing/debugging reasonably fast, I reduced the input to 50 red tiles. However, my experience is that you can push towards the 512 red tile limit (see Hardcaml solution line 38) if you can tolerate a simulation a bit north of an hour.
+After the recent changes, ~74% of the execution time goes to the UART transmission. As FPGA deployability is one of my main design goals, I didn't touch this. If you have other design objectives and constraints, consider attacking this big chunk of execution first.
 
 <br><br><br></details>
 
