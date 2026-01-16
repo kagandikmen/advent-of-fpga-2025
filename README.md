@@ -144,6 +144,20 @@ to flash your FPGA from the command line.
 
 ## Solution Details
 
+### General Principles
+
+I had these three design objectives while solving the puzzles:
+
+- High performance while staying area-considerate (aka "don't use a 512-bit wide multiplier if you don't have to")
+- FPGA deployability (aka "don't make your design a pie in the sky; keep IO & area realistic")
+- No host-side preprocessing of the puzzle input (aka "imagine we have no host-side control")
+
+Going through the solutions, you may see one of these objectives being relaxed in favor of another. For example, in the solutions I used a UART bus to transmit the input text from the host to the FPGA, which turned out to be the biggest consumer of cycles in a lot of cases. I kept the UART transmission, however, to keep my designs easily deployable on a relatively-cheap FPGA. Another example would be day 5, where there is minimal host-side preprocessing to packetize the ASCII character stream of the input text. This was to simplify the complicated input parsing logic for that day. Considering a lot of transmission protocols work on the principle of packages anyway, I don't consider this to be an unrealistic exercise.
+
+Additionally, in a lot of cases I "expect" the host to send the ASCII control character for "start of text" (STX, 0x02) before sending the puzzle input text. Likewise, I expect it to send "end of text" (ETX, 0x03) right after. However, I don't consider this to be host-side control, for me it is rather a reasonable expectation from the host.
+
+Below are the implementation details for the daily puzzles I worked on. They are all split into these three subsections: Summary, My Solution, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. In the final subsection, "Suggestions", I mostly share my observations and how you could improve on my solution.
+
 <details>
 <summary><b>Day 1:</b> Secret Entrance</summary><br>
 
@@ -180,17 +194,17 @@ module Compute_states = struct
 end
 ```
 
-The FPGA starts at `Idle`. In this state it is doing nothing, except for the fact that it is listening to the UART bus for the special ASCII control character "start of text." Once it is received, the FPGA transfers to the state `Receive` where it starts receiving unprocessed raw input text through the UART bus. The logic parses every line, registering the R or L at the start as positive or negative turn, and at each line break it saves the received turn value into its 16-bit wide FIFO. When the ASCII control character for "end of text" is received, the logic moves onto the state `Compute` where it waits for the knob turner logic to complete. When it is complete, it concludes everything by moving onto the state `Done`. 
+The FPGA starts at `Idle`. In this state it is doing nothing, except for the fact that it is listening to the UART bus for the special ASCII control character "start of text." Once it is received, the FPGA transfers to the state `Receive` where it starts receiving unprocessed raw input text through the UART bus. The logic parses every line, registering the R or L at the start as positive or negative turn, and at each line break it saves the received turn value into its 16-bit wide FIFO. When the ASCII control character for "end of text" is received, the logic moves onto the state `Compute` where it waits for the knob turner logic to complete. When it completes, the main FSM concludes everything by moving onto the state `Done`. 
 
-The knob turner logic is another state machine (a very simple one) that "runs in the background" while the FPGA is actually still listening to the UART bus for new knob turn data. Knob turner logic is triggered when the FIFO is no longer empty. This causes the knob turner state machine to move to its only active state `Turn`. In this state the turn magnitude and direction is analyzed and the values for part 1 and part 2 of the puzzle are updated accordingly. Because this logic is fast enough to conclude before the next turn is saved into the FIFO, the FIFO depth requirement is extremely low for this application.
+The knob turner logic is another state machine (a very simple one) that "runs in the background" while the FPGA is actually still listening to the UART bus for new knob turn data. Knob turner logic is triggered when the FIFO is no longer empty. This causes the knob turner state machine to move to its only active state `Turn`. In this state the turn magnitude and direction are analyzed and the running totals for part 1 and part 2 of the puzzle are updated accordingly. Because this logic is fast enough to conclude before the next turn is saved into the FIFO, the FIFO depth requirement is extremely low for this application.
 
-In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateless design which required the values to be converted into 16-bit integers on the host side. As I am on a newfound quest toward zero host-side processing, I felt a necessity to move away from this old design. To my surprise, the new design is 28% faster!
+In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateless design which required the values to be converted into 16-bit integers on the host side. As I later went on a newfound quest toward zero host-side processing, I felt the necessity to move away from this old design. To my surprise, the new design is 28% faster!
 
 ### Suggestions
 
-The knob turner logic is both much faster than the UART transmission and runs parallel to it. Therefore the UART transmission is the overwhelmingly biggest performance bottleneck. As one of my main design concerns is real-world FPGA deployability, I will not move away from the UART transmission. However, if you don't feel bounded by this, feel free to attack the data transmission first. You may need to increase the FIFO depth as you move towards faster transmission protocols. 
+The knob turner logic is both much faster than the UART transmission and runs in parallel to it. Therefore the UART transmission is the overwhelmingly biggest performance bottleneck. As one of my main design concerns is real-world FPGA deployability, I kept the UART bus. However, if you don't feel bounded by this, feel free to attack the data transmission first. You may need to increase the FIFO depth as you move towards faster transmission protocols. 
 
-To avoid costly division logic, I used a 10-step subtraction routine instead of dividing the rotation magnitude by 100. The same routine (function `divmod100`) also serves as modulo. It uses a trick, however: It makes use of the fact that our turns in the puzzle input never exceed 1000. In case you have bigger turn magnitudes, you need to increase the number of steps by modifying it.
+To avoid costly division logic, I used a 10-step subtraction routine instead of dividing the rotation magnitude by 100. The same routine, the function `divmod100`, also serves as modulo. It uses a trick, however: It makes use of the fact that our turns in the puzzle input never exceed 1000. In case you have bigger turn magnitudes, you need to increase the number of subtraction steps by modifying `divmod100`.
 
 <br><br><br></details>
 
