@@ -10,6 +10,18 @@ This repository is a fork of the [Hardcaml Arty](https://github.com/fyquah/hardc
 
 As its introductory [arXiv paper](https://arxiv.org/abs/2312.15035) puts it, Hardcaml is an embedded hardware design domain specific language. As its [GitHub README](https://github.com/janestreet/hardcaml) puts it, Hardcaml is an OCaml library for designing and testing hardware designs. In its core idea Hardcaml is very similar to Chisel. You can use Hardcaml to describe digital hardware in OCaml, run simulations, and convert your design into RTL (VHDL/Verilog).
 
+## Contents
+
+- [Advent Calendar (aka Project Progress)](#advent-calendar-aka-project-progress)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Building the Executables](#building-the-executables)
+- [Running the Tests](#running-the-tests)
+- [Programming your Arty A7 FPGA Board](#programming-your-arty-a7-fpga-board)
+- [Solution Details](#solution-details)
+- [Resource Utilization](#resource-utilization)
+- [License](#license)
+
 ## Advent Calendar (aka Project Progress)
 
 ██████████████████████████████░░░░░░&nbsp;&nbsp;&nbsp;83.3%
@@ -636,7 +648,7 @@ As simulating hardware is very slow, I once again switched real puzzle input wit
 
 ## Resource Utilization
 
-Below are the post-synthesis utilization results of each day for Digilent's Arty A7-100T board with XC7A100TCSG324-1 FPGA. To extract these metrics, the command `report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt` is used.
+Below are the post-synthesis utilization results of each day for Digilent's Arty A7-100T board with XC7A100TCSG324-1 FPGA. To extract these metrics, the Vivado command `report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt` was used.
 
 | Day | Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
 | --- | ---------: | ----: | -----: | -----: | --: |
