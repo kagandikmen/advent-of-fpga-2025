@@ -161,19 +161,19 @@ to flash your FPGA from the command line.
 
 I had four main design objectives while solving the puzzles. Sorted by importance, they are:
 
-1. FPGA deployability (aka "Don't make your design a pie in the sky; keep IO & area realistic, use known transmission protocols.")
-2. No host-side preprocessing of the puzzle input (aka "Imagine you have no host-side control.")
-3. High performance while staying area-conscious (aka "Make it fast but don't use a 512-bit wide multiplier if you don't have to.")
-4. Scalability (aka "How good can it handle inputs of different lengths and dimensionalities?")
+1. **FPGA deployability:** *"Don't make your design a pie in the sky; keep IO & area realistic, use known transmission protocols."*
+2. **No host-side preprocessing of the puzzle input:** *"Imagine you have no host-side control."*
+3. **High performance while staying area-conscious:** *"Make it fast but don't use a 512-bit wide multiplier if you don't have to."*
+4. **Scalability:** *"How good can it handle inputs of different lengths and dimensionalities?"*
 
-In accordance with the first design objective, FPGA deployability, I use UART for host-FPGA data transmision. UART is a well-known protocol and UART buses can be found on even the cheapest of FPGA boards. Again, to satisfy the first objective, I synthesize my solutions for my target FPGA board (Arty A7-100T) and share the resource utilization both in daily solution details and in its dedicated [section](#resource-utilization-summary) in this README file.
+In accordance with the first design objective, FPGA deployability, I use UART for host-FPGA data transmission. UART is a well-known protocol and UART buses can be found on even the cheapest of FPGA boards. Again, to satisfy the first objective, I synthesize my solutions for my target FPGA board (Arty A7-100T) and share the resource utilization both in daily solution details and in its dedicated [section](#resource-utilization-summary) in this README file.
 
 To satisfy the second objective, zero host-side preprocessing, I parse the text input of the puzzle on the FPGA. The host does no preprocessing of the input, not even data type conversions. The input text is sent through the UART bus in ASCII encoding.
 
-To satisfy the third objective, area-conscious performance optimization, I try to avoid "first store then process" type of architectures in my solutions. These type of architectures result in large storages and longer execution time, although they are sometimes dictated by the nature of the puzzle. On top of this, I introduce parallelism and pipelining wherever I can, as long as it does not violate the first two design objectives. For each daily solution, I share in its description how many clock cycle it takes to complete. A summary of daily performance data can also be found in its dedicated [section](#performance-summary) in this README file. To evaluate performance, two metrics are used: time to complete, transmission over execution.
+To satisfy the third objective, area-conscious performance optimization, I try to avoid "first store then process" type of architectures in my solutions. This type of architectures result in large storages and longer execution time, although they are sometimes dictated by the nature of the puzzle. On top of this, I introduce parallelism and pipelining wherever I can, as long as it does not violate the first two design objectives. For each daily solution, I share in its description how many clock cycles it takes to complete. A summary of daily performance data can also be found in its dedicated [section](#performance-summary) in this README file. To evaluate performance, two metrics are used: time to complete, transmission over execution.
 
-- *time to complete:* This is how many clock cycles it takes for the execution to be fully completed.
-- *transmission over execution:* Mathematically this equals to (time to fully transmit input text)/(time to complete). I introduce this metric because I am using a performance-wise costly transmission protocol for the sake of FPGA deployability. To compensate for this, I introduce pipelining and/or parallelism whenever I can. This metric shows how successful I am in that for the puzzle of the day. Values closer to 100% mean that my solution is already optimized to the point that the performance bottleneck is the host-FPGA communication.
+- **Time to Complete:** This is how many clock cycles it takes for the execution to be fully completed.
+- **Transmission over Execution:** Mathematically this equals to (time to fully transmit input text)/(time to complete). I introduce this metric because I am using a performance-wise costly transmission protocol for the sake of FPGA deployability. To compensate for this, I introduce pipelining and/or parallelism whenever I can. This metric shows how successful I am in that for the puzzle of the day. Values closer to 100% mean that my solution is already optimized to the point that the performance bottleneck is the host-FPGA communication.
 
 To satisfy the fourth objective, scalability, I try to architect my solutions in a way which enables them to be flexible about the input length and dimensionality. This has some limits, of course, due to constraints dictated by the very nature of hardware design. We cannot have infinite memory, or the input should not overflow result registers, for example.
 
@@ -183,7 +183,7 @@ Additionally, in my solutions I "expect" the host to send the ASCII control char
 
 Finally, solutions for day 8 and day 11 are validated using reduced inputs due to simulation runtime.
 
-Below are the implementation details for the daily puzzles I worked on. They are all split into these four subsections: Summary, My Solution, Metrics, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. After that, I share performance and utilization data in "Metrics." In the final subsection, "Suggestions", I mostly share my observations and how you could improve on my solution.
+Below are the implementation details for the daily puzzles I worked on. They are all split into these four subsections: Summary, My Solution, Evaluation, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. After that, I evaluate my solution against my main design objectives in subsection "Evaluation." Finally, in "Suggestions" I mostly share my observations and how you could improve on my solution.
 
 <details>
 <summary><b>Day 1:</b> Secret Entrance</summary><br>
@@ -227,7 +227,11 @@ The knob turner logic is another state machine (a very simple one) that "runs in
 
 In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateless design which required the values to be converted into 16-bit integers on the host side. As I later went on a newfound quest toward zero host-side processing, I felt the necessity to move away from this old design. To my surprise, the new design is 28% faster!
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle an infinitely long turn sequence. Turn magnitudes can go up to 999. This value can be changed by modifying the source code, but increasing it costs performance.  
 
 #### Performance
 
@@ -245,7 +249,7 @@ In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateles
 
 The knob turner logic is both much faster than the UART transmission and runs in parallel to it. Therefore the UART transmission is the overwhelmingly biggest performance bottleneck. As one of my main design concerns is real-world FPGA deployability, I kept the UART bus. However, if you don't feel bounded by this, feel free to attack the data transmission first. You may need to increase the FIFO depth as you move towards faster transmission protocols. 
 
-To avoid costly division logic, I used a 10-step subtraction routine instead of dividing the rotation magnitude by 100. The same routine, the function `divmod100`, also serves as modulo. It uses a trick, however: It makes use of the fact that our turns in the puzzle input never exceed 1000. In case you have bigger turn magnitudes, you need to increase the number of subtraction steps by modifying `divmod100`.
+To avoid costly division logic, I used a 10-step subtraction routine instead of dividing the rotation magnitude by 100. The same routine, the function `divmod100`, also serves as modulo. It uses a trick, however: It makes use of the fact that our turns in the puzzle input never exceed 999. In case you have bigger turn magnitudes, you need to increase the number of subtraction steps by modifying `divmod100`.
 
 <br><br><br></details>
 
@@ -302,7 +306,11 @@ In my [older solution](src/old/day02/day02.ml) for this puzzle, I was:
 
 Horrible solution, I know. The new one is incomparably better.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle an infinite number of integer ranges, as long as 64-bit result registers are not overflowed. Integers can have up to 10 digits.  
 
 #### Performance
 
@@ -318,7 +326,9 @@ Horrible solution, I know. The new one is incomparably better.
 
 ### Suggestions
 
-The UART transmission continues running in parallel while the first ranges are already being processed. Considering this with the fact that processing one range takes much longer than just receiving it, the UART transmission is not the performance bottleneck in this application. The by far biggest chunk of execution is the evaluation state of the processing engine. Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. In the end, the set of all silly/goofy numbers does not change from range to range. However, I don't know what kind of effect this would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify it. You can try this out and let me know; don't hesitate to create an issue or pull request.
+The UART transmission continues running in parallel while the first ranges are already being processed. Considering this with the fact that processing one range takes much longer than just receiving it, the UART transmission is not the performance bottleneck in this application. The by far biggest chunk of execution is the evaluation state of the processing engine. 
+
+Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. This is certain to increase performance, but I don't know what kind of effect it would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify the switch. You can try this out and let me know; don't hesitate to create an issue or pull request.
 
 <br><br><br></details>
 
@@ -337,7 +347,11 @@ The puzzle of day 3 also consists of two parts. For any given digit sequence, th
 
 [My solution](src/day03/day03.ml) for day 3 is a stateless one. In this stateless solution, the raw text input received through the UART bus is processed as digits arrive one by one. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first part of the puzzle. 88 of them for the second part, likewise. For any given k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are added to a running total.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle an infinite number of banks. Bank width, 100, is hardcoded. (See suggestions below.)  
 
 #### Performance
 
@@ -357,7 +371,7 @@ My implementation hardcodes the bank width, 100, into the logic. Although this i
 
 If you can come up with a solution including none of those; don't hesitate to create an issue or pull request.
 
-Nevertheless, the number of digits to leave, k, is not hardcoded. It is a parameter of the `create` function. So, my solution is actually in no way tailored to the first or second part of the puzzle. If you wonder what the result would be for k = 3, just set k three!
+Nevertheless, the number of digits to leave, k, is not hardcoded. It is a parameter of the `create` function. So, my solution is actually in no way tailored to the first or second part of the puzzle. If you wonder what the result would be for k = 3, just instantiate my solution with k set to three!
 
 <br><br><br></details>
 
@@ -407,9 +421,13 @@ In my [older solution](src/old/day04/day04.ml) for this puzzle, I was:
 
 Because this involved iterating twice over the grid for each remove pass, it was very inefficient and significantly slower. After moving to this new solution I have seen a 9.4% acceleration for the first part of the puzzle and a 36.5% acceleration for the second part.
 
-I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accommodate row counts and column counts up to 256, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
+I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accommodate row counts and column counts up to 254, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle 2D spaces up to 254x254. Row count and column count can be different.  
 
 #### Performance
 
@@ -426,11 +444,11 @@ I have another retired solution for this puzzle which was similar to the current
 
 ### Suggestions
 
-Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so my solution does not have an excessive memory/area footprint, either.
+Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the storage is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so my solution does not have an excessive memory/area footprint, either.
 
 The waveforms reveal that the biggest performance bottleneck of the application is the UART transmission, but I intend to keep the UART bus as FPGA deployability is my biggest design objective. Nevertheless, if you are bound by different design objectives and constraints, the host-FPGA data transmission is the part of the solution you should look at first.
 
-What I especially like about this solution is that it is actually in no way tailored to part 1 or 2 of the puzzle. `max_passes` is a design parameter that goes into the `create` function. If you are curious about how many rolls would be removed after three remove passes, just set `max_passes` three!
+What I especially like about this solution is that it is actually in no way tailored to part 1 or 2 of the puzzle. `max_passes` is a design parameter that goes into the `create` function. If you are curious about how many rolls would be removed after three remove passes, just set `max_passes` three while you instantiate my solution!
 
 <br><br><br></details>
 
@@ -470,7 +488,11 @@ end
 
 The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the order they are fed to the UART bus by the host. The moment the host signals a section change, the logic transfers to the state `Read_ids`. When the host is done with sending all IDs, it signals EOF, and the logic starts sorting the ranges. The sorting process (selection sort) starts with the state `Scan`. In this state, the FPGA looks for the range with the lowest lower bound that is not marked as "used" yet. Then it moves onto the state `Merge`, which is where we scan through all unused ranges once again for candidates eligible for a range merge. Then, if there are still unused ranges left, the FPGA goes back to the state `Scan`. Once the `Scan`-`Merge` loop is completed, the logic goes into the `Count` state. In this state, we count how many of the IDs fall in any one of the merged ranges. Finally, the FPGA arrives at the state `Done`, where it signals back to the host that the computation is successfully completed.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ⚠️ (packetization on the host-side)  
+**Scalability:** The input text can include up to 200 ranges. Likewise, it can include up to 1024 IDs. These values can be increased by modifying the source code, but this comes with a performance & area cost.  
 
 #### Performance
 
@@ -534,7 +556,11 @@ When both secondary state machines arrive at their `Done` state and return, the 
 
 There was an [older solution](src/old/day06/day06.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. This older array-based implementation had an exceedingly high simulation runtime, simulating the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour. Nevertheless, they are equivalent in terms of FPGA performance.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** The input text can have up to 8 rows, and each row can have up to 4096 characters. These values can be increased by modifying the source code, but this comes with a performance & area cost.  
 
 #### Performance
 
@@ -552,11 +578,11 @@ There was an [older solution](src/old/day06/day06.ml) for this puzzle where the 
 
 I feel like the main state machine could be made more compact by removing the state `Setup_compute`. I am planning to revisit this puzzle to see if the compute setup can be moved to the `Find_opblk_end` and/or `Compute` states.
 
-Another idea would be to implement "opblock engines" for each opblock received/saved. Iterating over the rows (either during transmission or after it,) each value on the row would be sent to its dedicated opblock engine, which would both add and multiply all the operands as they come. Once the final row arrives with the correct operation, the opblock engine would then already have the result and return it immediately. 
+Another idea would be to implement "opblock engines" for each opblock received/saved. Iterating over the rows (either during transmission or after it,) each value on the row would be sent to its dedicated opblock engine, which would both add and multiply all the operands as they come. Once the final row arrives with the correct operation, the opblock engine would then already have the result and return it immediately.
 
-The biggest performance bottleneck of the new version of the application is the UART transmission, which consumes around 95% of the cycles. I intend to keep the UART bus for seamless FPGA deployment in the future, which is one of my three main design objectives. In case your situation allows you to opt for a parallel (or simply faster) protocol, this opblock engines idea would be worth considering.
+But all this under a condition: As the relation "opblocks per row" grows, this idea of parallel processing would prove impractical due to power and/or area concerns. A very big opblock/row ratio was indeed the case for me, so I didn't go that direction. But feel free to consider this idea if you have a different input dimensionality.
 
-But all this under a condition: As the relation "opblocks per row" grows, this idea of parallel processing could prove impractical due to power and/or area concerns.
+The biggest performance bottleneck of the new version of the application is the UART transmission, which consumes around 97% of the cycles. I intend to keep the UART bus for seamless FPGA deployment in the future, which is one of my four main design objectives. In case your situation allows you to opt for a parallel (or simply faster) protocol, this opblock engines idea would be worth considering.
 
 <br><br><br></details>
 
@@ -598,7 +624,7 @@ The main state machine starts at state `Idle` and listens to the UART bus for th
 
 The compute engine, which has the simple state machine `Idle` <-> `Compute_row`, fulfills the function of reading latest row from the FIFO, analyzing it, and updating various registers to keep track of the current state of the computation. It sits idle while the FIFO is empty, whereas it transfers to `Compute_row` when there is any row data in the FIFO.
 
-This approach with two state machines enables a great deal of parallelism. The rows are processed as they come; they are not first saved and then processed in bulk, which would cost a lot of performance and area. Moreover, the compute engine processes all columns of the row in parallel (by taking account of what happens in the neighbor columns), which also brings about a great deal of performance gains.
+This approach with two state machines enables a great deal of parallelism. The rows are processed as they come; they are not first saved and then processed in bulk, which would cost a lot of performance and area. Moreover, the compute engine processes all columns of the row in parallel (by taking account of what happens in the neighbor columns), and therefore processing an entire row takes only one cycle!
 
 In fact, I had an [older solution](src/old/day07/day07.ml) for this puzzle where I used to:
 
@@ -615,7 +641,11 @@ This was of course neither an elegant solution nor efficient. The performance co
 
 Because the total execution is dominated by the UART transmission, the total time is reduced by 2% only. However, the time spent after the UART transmission is reduced by 99.5% with the newer solution.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle an infinite number of rows. Column count can go up to 256. This can be increased by modifying the source code, but with a performance & area cost.  
 
 #### Performance
 
@@ -631,7 +661,7 @@ Because the total execution is dominated by the UART transmission, the total tim
 
 ### Suggestions
 
-The table above displays very well what the main performance bottleneck of the application is: the UART transmission. I will keep the UART bus because one of my main design objectives is FPGA deployability, but feel free to attack the data transmission if you are bound by different concerns and constraints. You may need to adjust the FIFO depth in case your transmission bandwidth is higher.
+The performance metrics display very well what the main performance bottleneck of the application is: the UART transmission. I will keep the UART bus because one of my main design objectives is FPGA deployability, but feel free to attack the data transmission if you are bound by different concerns and constraints. You may need to adjust the FIFO depth in case your transmission bandwidth is higher.
 
 One of the great things about this solution is that it actually does not put any limit on how many rows the input text is allowed to have. The AoC puzzle input has 142 rows like it has 142 columns, but the Hardcaml solution is able to continue until its 64-bit `cur_rays` registers or result registers are overflowed.
 
@@ -656,7 +686,13 @@ The logic then continues by initiating the "graph," which is just two arrays in 
 
 After the bitonic sort, the FPGA continues by setting the graph up, and then it starts fetching the possible connections one by one, starting from the shortest-distance one. If the vertices are not already in the same circuit, their circuits are merged. Once all vertices are part of the same circuit, the FPGA concludes the computation. As usual, the host is notified for the end of computation through a done signal.
 
-### Metrics
+### Evaluation
+
+*This solution was dimensioned for a reduced input. See Suggestions.*
+
+**FPGA deployability:** ⚠️ (Reduced input version fits in target FPGA. Full input version does not.)  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle up to 64 vertices. This can be increased by modifying the source code, but with a performance & area cost.  
 
 #### Performance
 
@@ -722,7 +758,11 @@ In my [older solution](src/old/day09/day09.ml), I used to:
 
 This was orders of magnitude slower and more area-hungry than my current solution, of course. In fact, I wasn't even able to run the entire text input due to time concerns. For the same small toy input of 50 red tiles, I have seen the execution time drop from 62550 us to 360 us after moving to the newer solution, which constitutes a 99.4% acceleration.
 
-### Metrics
+### Evaluation
+
+**FPGA deployability:** ✅  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle up to 512 red tiles. This value can be increased by modifying the source code, but with a performance & area cost.  
 
 #### Performance
 
@@ -780,7 +820,13 @@ NP(fft -> out)    # For Part 2
 
 Finally, these values are used to compute the values required for both parts of the puzzle, and then the host is notified with a done signal.
 
-### Metrics
+### Evaluation
+
+*This solution was dimensioned for a reduced input. See Suggestions.*
+
+**FPGA deployability:** ⚠️ (Reduced input version fits in target FPGA. Full input version slightly exceeds the LUT count.)  
+**No host-side preprocessing:** ✅  
+**Scalability:** Can handle up to 256 nodes and up to 1024 edges. These values can be increased by modifying the source code, but this comes with a performance & area cost.  
 
 #### Performance
 
@@ -792,7 +838,7 @@ Finally, these values are used to compute the values required for both parts of 
 
 | Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
 | ---------: | ----: | -----: | -----: | --: |
-|     103958 | 89636 |      0 |      0 |   0 |
+|      45930 | 41995 |      0 |      0 |   0 |
 
 ### Suggestions
 
@@ -815,9 +861,11 @@ Below is a summary of the performance metrics of each day. These values are extr
 | 05  |                   585,362 |                94.139% |
 | 06  |                   848,896 |                97.081% |
 | 07  |                   887,266 |                99.998% |
-| 08  |                   420,368 |                 9.243% |
+| 08* |                   420,368 |                 9.243% |
 | 09  |                12,635,280 |                 2.001% |
-| 11  |                     5,158 |                94.707% |
+| 11* |                     5,158 |                94.707% |
+
+\* *reduced input*
 
 ## Resource Utilization Summary
 
@@ -832,9 +880,11 @@ Below is a summary of the post-synthesis utilization results of each day for Dig
 | 05  |      10567 | 13316 |      0 |      0 |   0 |
 | 06  |       8411 |  4273 |      0 |      0 |   0 |
 | 07  |         61 |    44 |      0 |      0 |   0 |
-| 08  |      51650 |  7990 |      8 |      0 |  12 |
+| 08* |      51650 |  7990 |      8 |      0 |  12 |
 | 09  |      54973 | 33347 |      2 |      0 |   4 |
-| 11  |     103958 | 89636 |      0 |      0 |   0 |
+| 11* |      45930 | 41995 |      0 |      0 |   0 |
+
+\* *reduced input*
 
 According to its [data sheet](https://docs.amd.com/v/u/en-US/ds180_7Series_Overview), XC7A100TCSG324-1 FPGA has the following features:
 
@@ -842,7 +892,7 @@ According to its [data sheet](https://docs.amd.com/v/u/en-US/ds180_7Series_Overv
 | --------- | ---------: | -----: | -----: | -----: | --: |
 | XC7A100T  |     101440 | 126800 |    135 |    270 | 240 |
 
-Apart from day 11, which slightly exceeds the look-up table capacity and would require further optimization or a larger device, all solutions comfortably fit on my target FPGA.
+Apart from full input versions of days 8 and 11, all solutions comfortably fit on my target FPGA.
 
 ## License
 
