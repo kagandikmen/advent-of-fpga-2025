@@ -652,7 +652,7 @@ Below are the post-synthesis utilization results of each day for Digilent's Arty
 
 | Day | Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
 | --- | ---------: | ----: | -----: | -----: | --: |
-| 01  |         50 |    43 |      0 |      0 |   0 |
+| 01  |         48 |    42 |      0 |      0 |   0 |
 | 02  |        207 |    98 |      0 |      0 |   0 |
 | 03  |         30 |    29 |      0 |      0 |   0 |
 | 04  |        111 |    79 |      0 |      0 |   0 |

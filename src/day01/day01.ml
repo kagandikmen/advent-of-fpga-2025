@@ -2,7 +2,7 @@
  *
  * AoF - Hardcaml Solution for Day 1
  * Created:     2026-01-10
- * Modified:    2026-01-12
+ * Modified:    2026-01-16
  * Author:      Kagan Dikmen
  *
  *)
@@ -54,7 +54,7 @@ let divmod100 (d : Signal.t) : Signal.t * Signal.t =
 let create_logic ~clock ~clear (uart_rx: Signal.t Uart.Byte_with_valid.t) =
   let open Always in
 
-  let fifo_depth = 4 in (* subject to change come back to this *)
+  let fifo_depth = 2 in (* subject to change come back to this *)
 
   let spec = Reg_spec.create
     ~clock
