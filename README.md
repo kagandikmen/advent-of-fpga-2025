@@ -19,7 +19,8 @@ As its introductory [arXiv paper](https://arxiv.org/abs/2312.15035) puts it, Har
 - [Running the Tests](#running-the-tests)
 - [Programming your Arty A7 FPGA Board](#programming-your-arty-a7-fpga-board)
 - [Solution Details](#solution-details)
-- [Resource Utilization](#resource-utilization)
+- [Performance Summary](#performance-summary)
+- [Resource Utilization Summary](#resource-utilization-summary)
 - [License](#license)
 
 ## Advent Calendar (aka Project Progress)
@@ -158,19 +159,31 @@ to flash your FPGA from the command line.
 
 ### General Principles
 
-I had three main design objectives while solving the puzzles. Sorted by importance, they are:
+I had four main design objectives while solving the puzzles. Sorted by importance, they are:
 
-1. FPGA deployability (aka "don't make your design a pie in the sky; keep IO & area realistic")
-2. No host-side preprocessing of the puzzle input (aka "imagine you have no host-side control")
-3. High performance while staying area-conscious (aka "make it fast but don't use a 512-bit wide multiplier if you don't have to")
+1. FPGA deployability (aka "Don't make your design a pie in the sky; keep IO & area realistic, use known transmission protocols.")
+2. No host-side preprocessing of the puzzle input (aka "Imagine you have no host-side control.")
+3. High performance while staying area-conscious (aka "Make it fast but don't use a 512-bit wide multiplier if you don't have to.")
+4. Scalability (aka "How good can it handle inputs of different lengths and dimensionalities?")
 
-Going through the solutions, you may occasionally see a lower-priority objective relaxed in favor of a higher-priority one. For example, in my solutions I used a UART bus to transmit the input text from the host to the FPGA, which turned out to be the biggest consumer of cycles in a lot of cases. I kept the UART transmission, however, to keep my designs easily deployable on a relatively-cheap FPGA. Another example would be day 5, where there is minimal host-side preprocessing to packetize the ASCII character stream of the input text. This was to simplify the complicated input parsing logic for that day. Considering a lot of transmission protocols work on the principle of packages anyway, I don't consider this to be an unrealistic exercise.
+In accordance with the first design objective, FPGA deployability, I use UART for host-FPGA data transmision. UART is a well-known protocol and UART buses can be found on even the cheapest of FPGA boards. Again, to satisfy the first objective, I synthesize my solutions for my target FPGA board (Arty A7-100T) and share the resource utilization both in daily solution details and in its dedicated [section](#resource-utilization-summary) in this README file.
 
-Additionally, in a lot of cases I "expect" the host to send the ASCII control character for "start of text" (STX, 0x02) before sending the puzzle input text. Likewise, I expect it to send "end of text" (ETX, 0x03) right after. However, this is fairly innocent input framing in my opinion, which entails no host-side processing.
+To satisfy the second objective, zero host-side preprocessing, I parse the text input of the puzzle on the FPGA. The host does no preprocessing of the input, not even data type conversions. The input text is sent through the UART bus in ASCII encoding.
+
+To satisfy the third objective, area-conscious performance optimization, I try to avoid "first store then process" type of architectures in my solutions. These type of architectures result in large storages and longer execution time, although they are sometimes dictated by the nature of the puzzle. On top of this, I introduce parallelism and pipelining wherever I can, as long as it does not violate the first two design objectives. For each daily solution, I share in its description how many clock cycle it takes to complete. A summary of daily performance data can also be found in its dedicated [section](#performance-summary) in this README file. To evaluate performance, two metrics are used: time to complete, transmission over execution.
+
+- *time to complete:* This is how many clock cycles it takes for the execution to be fully completed.
+- *transmission over execution:* Mathematically this equals to (time to fully transmit input text)/(time to complete). I introduce this metric because I am using a performance-wise costly transmission protocol for the sake of FPGA deployability. To compensate for this, I introduce pipelining and/or parallelism whenever I can. This metric shows how successful I am in that for the puzzle of the day. Values closer to 100% mean that my solution is already optimized to the point that the performance bottleneck is the host-FPGA communication.
+
+To satisfy the fourth objective, scalability, I try to architect my solutions in a way which enables them to be flexible about the input length and dimensionality. This has some limits, of course, due to constraints dictated by the very nature of hardware design. We cannot have infinite memory, or the input should not overflow result registers, for example.
+
+Going through the solutions, you may occasionally see a lower-priority objective relaxed in favor of a higher-priority one. For example, UART is a relatively slow data transmission protocol. Nonetheless, I kept the UART transmission to keep my designs easily deployable on a cheap FPGA board. Another example would be day 5, where there is minimal host-side preprocessing to packetize the ASCII character stream of the input text. This was to simplify the complicated input parsing logic for that day. Considering a lot of transmission protocols work on the principle of packages anyway, I don't consider this to be an unrealistic exercise.
+
+Additionally, in my solutions I "expect" the host to send the ASCII control character for "start of text" (STX, 0x02) before sending the puzzle input text. Likewise, I expect it to send "end of text" (ETX, 0x03) right after. However, this is fairly innocent input framing in my opinion, which entails no host-side processing.
 
 Finally, solutions for day 8 and day 11 are validated using reduced inputs due to simulation runtime.
 
-Below are the implementation details for the daily puzzles I worked on. They are all split into these three subsections: Summary, My Solution, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. In the final subsection, "Suggestions", I mostly share my observations and how you could improve on my solution.
+Below are the implementation details for the daily puzzles I worked on. They are all split into these four subsections: Summary, My Solution, Metrics, Suggestions. In "Summary", I share a short summary of the puzzle as a reminder for the informed reader and an introduction for the innocent bystander. In "My Solution", I elaborate into how I implemented my solution. I usually explain my solution based on its control logic. It is also this subsection where I share information about any older solution I might have for the day and why I decided to refactor it. After that, I share performance and utilization data in "Metrics." In the final subsection, "Suggestions", I mostly share my observations and how you could improve on my solution.
 
 <details>
 <summary><b>Day 1:</b> Secret Entrance</summary><br>
@@ -213,6 +226,20 @@ The FPGA starts at `Idle`. In this state it is doing nothing, except for the fac
 The knob turner logic is another state machine (a very simple one) that "runs in the background" while the FPGA is actually still listening to the UART bus for new knob turn data. Knob turner logic is triggered when the FIFO is no longer empty. This causes the knob turner state machine to move to its only active state `Turn`. In this state the turn magnitude and direction are analyzed and the running totals for part 1 and part 2 of the puzzle are updated accordingly. Because this logic is fast enough to conclude before the next turn is saved into the FIFO, the FIFO depth requirement is extremely low for this application.
 
 In my [older solution](src/old/day01/day01.ml) for this puzzle, I had a stateless design which required the values to be converted into 16-bit integers on the host side. As I later went on a newfound quest toward zero host-side processing, I felt the necessity to move away from this old design. To my surprise, the new design is 28% faster!
+
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   797,505 |                99.998% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|         48 |    42 |      0 |      0 |   0 |
 
 ### Suggestions
 
@@ -275,6 +302,20 @@ In my [older solution](src/old/day02/day02.ml) for this puzzle, I was:
 
 Horrible solution, I know. The new one is incomparably better.
 
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                 3,849,453 |                 5.784% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|        207 |    98 |      0 |      0 |   0 |
+
 ### Suggestions
 
 The UART transmission continues running in parallel while the first ranges are already being processed. Considering this with the fact that processing one range takes much longer than just receiving it, the UART transmission is not the performance bottleneck in this application. The by far biggest chunk of execution is the evaluation state of the processing engine. Currently, the FPGA dynamically computes all silly/goofy numbers on the run. I am thinking a possible next step could be to explore what happens if we made this computation static. In the end, the set of all silly/goofy numbers does not change from range to range. However, I don't know what kind of effect this would have on area/resource usage. I also don't know if this increase in logic footprint would result in a performance increase good enough to justify it. You can try this out and let me know; don't hesitate to create an issue or pull request.
@@ -296,9 +337,25 @@ The puzzle of day 3 also consists of two parts. For any given digit sequence, th
 
 [My solution](src/day03/day03.ml) for day 3 is a stateless one. In this stateless solution, the raw text input received through the UART bus is processed as digits arrive one by one. In this puzzle, each sequence has exactly 100 digits. This means we are allowed to drop 98 of them for the first part of the puzzle. 88 of them for the second part, likewise. For any given k, the FPGA first computes how many digits can be dropped per bank, 100 - k. Then it processes every arriving digit immediately by comparing it to the already-picked values. Given there are still enough remaining "drop credits" at the time of arrival, the previously-picked digits are dropped if they are smaller than the incoming one. Finally, once all 100 digits are processed, the remaining digits are added to a running total.
 
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   888,846 |                   100% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|         30 |    29 |      0 |      0 |   0 |
+
 ### Suggestions
 
-My implementation hardcodes the bank width, 100, into the logic. Although this is easily changeable in the source code, one may want a design capable of adjusting itself to different bank widths. This could be managed by first saving the bank(s) in the FPGA and then processing the digits one by one, but this would both require storage and reduce performance. In the most ideal case, the digit sequences are processed "on the go" as they arrive without introduction of hardcoded widths, arrays, RAMs, FIFOs, or state machines. I considered all these additional components, and decided for this case that hardcoding the bank width was the least harmful. If you can come up with a solution including none of those; don't hesitate to create an issue or pull request.
+My implementation hardcodes the bank width, 100, into the logic. Although this is easily changeable in the source code, one may want a design capable of adjusting itself to different bank widths. This could be managed by first saving the bank(s) in the FPGA and then processing the digits one by one, but this would both require storage and reduce performance. In the most ideal case, the digit sequences are processed "on the go" as they arrive without introduction of hardcoded widths, arrays, RAMs, FIFOs, or state machines. I considered all these additional components, and decided for this case that hardcoding the bank width was the least harmful. (Just look above for the incredible metrics! I didn't want to ruin that.)
+
+If you can come up with a solution including none of those; don't hesitate to create an issue or pull request.
 
 Nevertheless, the number of digits to leave, k, is not hardcoded. It is a parameter of the `create` function. So, my solution is actually in no way tailored to the first or second part of the puzzle. If you wonder what the result would be for k = 3, just set k three!
 
@@ -352,6 +409,21 @@ Because this involved iterating twice over the grid for each remove pass, it was
 
 I have another retired solution for this puzzle which was similar to the current one but it had the puzzle input dimensionality, 140, hardcoded into the hardware. Current version can now accommodate row counts and column counts up to 256, and they can also be different from each other. The hardware picks up the dimensions automatically using the positioning of the newline characters.
 
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                 1,910,574 |                44.178% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|        111 |    79 |      0 |      0 |   0 |
+
+
 ### Suggestions
 
 Because we are instructed in part 2 to peel infinitely until there is no more peeling to do, the grid has to be stored on the FPGA. There seems to be no getting rid of this; the grid is a necessity rather than a design choice. The control logic and the state machine also seem lean enough to me. Each cell of the grid is 2-bit wide, so my solution does not have an excessive memory/area footprint, either.
@@ -397,6 +469,20 @@ end
 ```
 
 The FPGA, starting in the state `Read_ranges`, first reads all the ranges in the order they are fed to the UART bus by the host. The moment the host signals a section change, the logic transfers to the state `Read_ids`. When the host is done with sending all IDs, it signals EOF, and the logic starts sorting the ranges. The sorting process (selection sort) starts with the state `Scan`. In this state, the FPGA looks for the range with the lowest lower bound that is not marked as "used" yet. Then it moves onto the state `Merge`, which is where we scan through all unused ranges once again for candidates eligible for a range merge. Then, if there are still unused ranges left, the FPGA goes back to the state `Scan`. Once the `Scan`-`Merge` loop is completed, the logic goes into the `Count` state. In this state, we count how many of the IDs fall in any one of the merged ranges. Finally, the FPGA arrives at the state `Done`, where it signals back to the host that the computation is successfully completed.
+
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   585,362 |                94.139% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|      10567 | 13316 |      0 |      0 |   0 |
 
 ### Suggestions
 
@@ -447,6 +533,20 @@ When the host transfers the ASCII value "end of text," the FPGA moves onto the s
 When both secondary state machines arrive at their `Done` state and return, the primary state machine adds the return values into a running total and continues with the next iteration of the loop: `Find_opblk_start`-`Find_opblk_end`-`Setup_compute`-`Compute`. After all opblocks are processed this way, the running totals are returned to the host.
 
 There was an [older solution](src/old/day06/day06.ml) for this puzzle where the characters were saved in an array called `grid` instead of a RAM. This older array-based implementation had an exceedingly high simulation runtime, simulating the newer RAM-based implementation is incomparably faster. With the full puzzle input, the newer solution takes ~4 minutes to simulate on my machine. The older solution was still going strong when I terminated it after an hour. Nevertheless, they are equivalent in terms of FPGA performance.
+
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   848,896 |                97.081% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|       8411 |  4273 |      0 |      0 |   0 |
 
 ### Suggestions
 
@@ -508,12 +608,26 @@ In fact, I had an [older solution](src/old/day07/day07.ml) for this puzzle where
 
 This was of course neither an elegant solution nor efficient. The performance comparison of the older and newer solutions are as follows:
 
-|           | Total Time (us) | Time After End of Receive (us) |
-|-----------|-----------------|--------------------------------|
-| **New**   | 8874            | 1.02                           |
-| **Old**   | 9075            | 202.02                         |
+|           | Time to Complete (cycles) | Transmission/Execution |
+|-----------| ------------------------: | ---------------------: |
+| **New**   |                   887,266 |                99.998% |
+| **Old**   |                   907,426 |                97.778% |
 
 Because the total execution is dominated by the UART transmission, the total time is reduced by 2% only. However, the time spent after the UART transmission is reduced by 99.5% with the newer solution.
+
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   887,266 |                99.998% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|         61 |    44 |      0 |      0 |   0 |
 
 ### Suggestions
 
@@ -541,6 +655,20 @@ After all distances are computed, the FPGA sorts the connections by ascending di
 The logic then continues by initiating the "graph," which is just two arrays in this case. The idea is similar to what I implemented in [my Python reference solution](test/day08/ref.py), which is basically [Kruskal's algorithm](https://en.wikipedia.org/wiki/Kruskal%27s_algorithm). In this application of the algorithm, we treat the points as the vertices of a graph, and the connections between them as the edges. We use two arrays (lists in Python) both with a size equal to the number of points. The first array is called `parents` and stores the parent of each vertex. For each circuit one of the vertices is the "eldest parent" or "root," which means it directly or indirectly fathers all the other vertices in the circuit. (It actually does not matter much which vertex the root is.) The second array is called `sizes` and for each root vertex it stores the size of its circuit. For vertices that are not the root of the circuit, the size array does not store any meaningful value.
 
 After the bitonic sort, the FPGA continues by setting the graph up, and then it starts fetching the possible connections one by one, starting from the shortest-distance one. If the vertices are not already in the same circuit, their circuits are merged. Once all vertices are part of the same circuit, the FPGA concludes the computation. As usual, the host is notified for the end of computation through a done signal.
+
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                   420,368 |                 9.243% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|      51650 |  7990 |      8 |      0 |  12 |
 
 ### Suggestions
 
@@ -594,6 +722,20 @@ In my [older solution](src/old/day09/day09.ml), I used to:
 
 This was orders of magnitude slower and more area-hungry than my current solution, of course. In fact, I wasn't even able to run the entire text input due to time concerns. For the same small toy input of 50 red tiles, I have seen the execution time drop from 62550 us to 360 us after moving to the newer solution, which constitutes a 99.4% acceleration.
 
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                12,635,280 |                 2.001% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|      54973 | 33347 |      2 |      0 |   4 |
+
 ### Suggestions
 
 After the recent changes, ~74% of the execution time goes to the UART transmission. As FPGA deployability is one of my main design goals, I didn't touch this. If you have other design objectives and constraints, consider attacking this big chunk of execution first.
@@ -638,6 +780,20 @@ NP(fft -> out)    # For Part 2
 
 Finally, these values are used to compute the values required for both parts of the puzzle, and then the host is notified with a done signal.
 
+### Metrics
+
+#### Performance
+
+| Time to Complete (cycles) | Transmission/Execution |
+| ------------------------: | ---------------------: |
+|                     5,158 |                94.707% |
+
+#### Utilization
+
+| Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| ---------: | ----: | -----: | -----: | --: |
+|     103958 | 89636 |      0 |      0 |   0 |
+
 ### Suggestions
 
 I am an electrical engineer; my exposure to concepts such as topological order or Kahn's algorithm does not come from a formal CS training. If you think this could be done better, either through a simpler/better implementation or through a completely different algorithm, please open an issue.
@@ -646,9 +802,26 @@ As simulating hardware is very slow, I once again switched real puzzle input wit
 
 <br><br><br></details>
 
-## Resource Utilization
+## Performance Summary
 
-Below are the post-synthesis utilization results of each day for Digilent's Arty A7-100T board with XC7A100TCSG324-1 FPGA. To extract these metrics, the Vivado command `report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt` was used.
+Below is a summary of the performance metrics of each day. These values are extracted from waveforms of the simulations.
+
+| Day | Time to Complete (cycles) | Transmission/Execution |
+| --- | ------------------------: | ---------------------: |
+| 01  |                   797,505 |                99.998% |
+| 02  |                 3,849,453 |                 5.784% |
+| 03  |                   888,846 |                   100% |
+| 04  |                 1,910,574 |                44.178% |
+| 05  |                   585,362 |                94.139% |
+| 06  |                   848,896 |                97.081% |
+| 07  |                   887,266 |                99.998% |
+| 08  |                   420,368 |                 9.243% |
+| 09  |                12,635,280 |                 2.001% |
+| 11  |                     5,158 |                94.707% |
+
+## Resource Utilization Summary
+
+Below is a summary of the post-synthesis utilization results of each day for Digilent's Arty A7-100T board with XC7A100TCSG324-1 FPGA. To extract these metrics, the Vivado command `report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt` was used.
 
 | Day | Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
 | --- | ---------: | ----: | -----: | -----: | --: |
