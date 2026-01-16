@@ -1,6 +1,6 @@
 # Decorating the North Pole in Hardcaml
 
-[![AoF 2025 - Puzzle Tests](https://github.com/kagandikmen/aof-2025-temp/actions/workflows/run_tests.yaml/badge.svg)](https://github.com/kagandikmen/aof-2025-temp/actions/workflows/run_tests.yaml)
+[![AoF 2025 - Puzzle Tests](https://github.com/kagandikmen/advent-of-fpga-2025/actions/workflows/run_tests.yaml/badge.svg)](https://github.com/kagandikmen/advent-of-fpga-2025/actions/workflows/run_tests.yaml)
 
 This repository contains my solutions to the [Advent of FPGA 2025](https://blog.janestreet.com/advent-of-fpga-challenge-2025/) challenge from Jane Street.
 
