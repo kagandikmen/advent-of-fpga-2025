@@ -2,10 +2,14 @@
  *
  * AoF - Hardcaml Solution for Day 9
  * Created:     2026-01-02
- * Modified:    2026-01-15
+ * Modified:    2026-01-16
  * Author:      Kagan Dikmen
  *
  *)
+
+(*************************** IMPORTANT ****************************)
+(* For an older solution, see src/old/day09/                      *)
+(******************************************************************)
 
 open! Core
 open! Hardcaml
