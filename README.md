@@ -634,6 +634,31 @@ As simulating hardware is very slow, I once again switched real puzzle input wit
 
 <br><br><br></details>
 
+## Resource Utilization
+
+Below are the post-synthesis utilization results of each day for Digilent's Arty A7-100T board with XC7A100TCSG324-1 FPGA. To extract these metrics, the command `report_utilization -hierarchical -file outputs/post_synth_util_hier.rpt` is used.
+
+| Day | Total LUTs |   FFs | RAMB36 | RAMB18 | DSP |
+| --- | ---------: | ----: | -----: | -----: | --: |
+| 01  |         50 |    43 |      0 |      0 |   0 |
+| 02  |        207 |    98 |      0 |      0 |   0 |
+| 03  |         30 |    29 |      0 |      0 |   0 |
+| 04  |        111 |    79 |      0 |      0 |   0 |
+| 05  |      10567 | 13316 |      0 |      0 |   0 |
+| 06  |       8411 |  4273 |      0 |      0 |   0 |
+| 07  |         61 |    44 |      0 |      0 |   0 |
+| 08  |      51650 |  7990 |      8 |      0 |  12 |
+| 09  |      54973 | 33347 |      2 |      0 |   4 |
+| 11  |     103958 | 89636 |      0 |      0 |   0 |
+
+According to its [data sheet](https://docs.amd.com/v/u/en-US/ds180_7Series_Overview), XC7A100TCSG324-1 FPGA has the following features:
+
+|    Device | Total LUTs |    FFs | RAMB36 | RAMB18 | DSP |
+| --------- | ---------: | -----: | -----: | -----: | --: |
+| XC7A100T  |     101440 | 126800 |    135 |    270 | 240 |
+
+Apart from day 11, which slightly exceeds the look-up table capacity and would require further optimization or a larger device, all solutions comfortably fit on my target FPGA.
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
