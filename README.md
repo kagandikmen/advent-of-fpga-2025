@@ -768,7 +768,7 @@ This was orders of magnitude slower and more area-hungry than my current solutio
 
 | Time to Complete (cycles) | Transmission/Execution |
 | ------------------------: | ---------------------: |
-|                12,635,280 |                 2.001% |
+|                12,635,280 |                 2.009% |
 
 #### Utilization
 
@@ -778,7 +778,7 @@ This was orders of magnitude slower and more area-hungry than my current solutio
 
 ### Suggestions
 
-After the recent changes, ~74% of the execution time goes to the UART transmission. As FPGA deployability is one of my main design goals, I didn't touch this. If you have other design objectives and constraints, consider attacking this big chunk of execution first.
+After the recent changes, ~98% of the execution time goes to the computation itself. An idea would be the creation of multiple "processing engines" which would each explore different sections of the solution space (that being all two-combinations) in parallel. For this we probably need multiple instances of the dual-port RAM we have now, so consider this a performance vs. area tradeoff.
 
 <br><br><br></details>
 
@@ -862,7 +862,7 @@ Below is a summary of the performance metrics of each day. These values are extr
 | 06  |                   848,896 |                97.081% |
 | 07  |                   887,266 |                99.998% |
 | 08* |                   420,368 |                 9.243% |
-| 09  |                12,635,280 |                 2.001% |
+| 09  |                12,635,280 |                 2.009% |
 | 11* |                     5,158 |                94.707% |
 
 \* *reduced input*
